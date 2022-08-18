@@ -144,6 +144,8 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
           name: 'transactionname',
           label: 'Transaction Name'
         })
+        log.debug('tranid', tranid)
+        //log.debug('tranid', tranid)
 
         var fileterRes = finalSearchResults.filter(
           x => x.invoiceNumber === tranid
@@ -151,6 +153,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
 
         for (const iterator of fileterRes) {
           let obj = finalSearchResults[iterator.lineNo]
+          log.debug('obj', obj)
           obj.invoiceId = tranid
           obj.customerId = customer
           obj.internalid = internalid
@@ -161,7 +164,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
 
         //log.debug('fileteRes', fileterRes)
       }
-      log.debug('finalSearchResults', finalSearchResults)
+      //log.debug('finalSearchResults', finalSearchResults)
 
       return finalSearchResults
     } catch (e) {
@@ -172,74 +175,95 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   function map (mapContext) {
     try {
       var mapContextParse = JSON.parse(mapContext.value)
-      log.debug('mapContextParse', mapContextParse)
+      //log.debug('mapContextParse', mapContextParse)
 
-      // let invoiceId = mapContextParse.internalid;
-      // log.debug('invoiceId', invoiceId);
+      let invoiceId = mapContextParse.internalid
+      //log.debug('invoiceId', invoiceId);
 
-      // let customerInv = mapContextParse.customer;
-      // log.debug('customerInv', customerInv);
+      let customerInv = mapContextParse.customer
+      //log.debug('customerInv', customerInv);
 
-      // let spsPaidAmount = mapContextParse.netPaidAmt;
-      // log.debug('spsPaidAmount', spsPaidAmount);
+      let spsPaidAmount = mapContextParse.netPaidAmt
+      //log.debug('spsPaidAmount', spsPaidAmount);
 
-      // let invoiceNumber = mapContextParse.invoiceNumber;
-      // log.debug('invoiceNumber', invoiceNumber);
+      let invoiceNumber = mapContextParse.invoiceNumber
+      //log.debug('invoiceNumber', invoiceNumber);
 
-      // if (_logValidation(invoiceId) || _logValidation(customerInv) && _logValidation(spsPaidAmount) || _logValidation(invoiceNumber)) {
+      if (
+        _logValidation(invoiceId) ||
+        (_logValidation(customerInv) && _logValidation(spsPaidAmount)) ||
+        _logValidation(invoiceNumber)
+      ) {
+        var customerPayment = record.transform({
+          fromType: 'invoice',
+          fromId: invoiceId,
+          toType: 'customerPayment',
+          isDynamic: true
+        })
+        //log.debug('customerPayment', customerPayment);
 
-      //     var customerPayment = record.transform({
-      //         fromType: 'invoice',
-      //         fromId: invoiceId,
-      //         toType: 'customerPayment',
-      //         isDynamic: true
-      //     });
-      //     log.debug('customerPayment', customerPayment);
+        customerPayment.setValue({
+          fieldId: 'customer',
+          value: customerInv
+        })
 
-      //     customerPayment.setValue({
-      //         fieldId: 'customer',
-      //         value: customerInv
-      //     });
+        customerPayment.setValue({
+          fieldId: 'payment',
+          value: spsPaidAmount
+        })
 
-      //     customerPayment.setValue({
-      //         fieldId: 'payment',
-      //         value: spsPaidAmount
-      //     });
+        let applyLineCount = customerPayment.getLineCount({
+          sublistId: 'apply'
+        })
+        //log.debug('applyLineCount', applyLineCount);
 
-      //     let applyLineCount = customerPayment.getLineCount({ sublistId: 'apply' });
-      //     log.debug('applyLineCount', applyLineCount);
+        for (let i = 0; i < applyLineCount; i++) {
+          let refNum = customerPayment.getSublistValue({
+            sublistId: 'apply',
+            fieldId: 'refnum',
+            line: i
+          })
 
-      //     for (let i = 0; i < applyLineCount; i++) {
+          if (refNum == invoiceNumber) {
+            customerPayment.selectLine({ sublistId: 'apply', line: i })
 
-      //         let refNum = customerPayment.getSublistValue({ sublistId: 'apply', fieldId: 'refnum', line: i });
+            customerPayment.setCurrentSublistValue({
+              sublistId: 'apply',
+              fieldId: 'apply',
+              value: true
+            })
 
-      //         if (refNum == invoiceNumber) {
+            customerPayment.setCurrentSublistValue({
+              sublistId: 'apply',
+              fieldId: 'amount',
+              value: spsPaidAmount
+            })
 
-      //             customerPayment.selectLine({ sublistId: 'apply', line: i });
+            customerPayment.commitLine({ sublistId: 'apply' })
 
-      //             customerPayment.setCurrentSublistValue({sublistId: 'apply', fieldId: 'apply', value: true });
+            var payment_id = customerPayment.save({
+              enableSourcing: true,
+              ignoreMandatoryFields: true
+            })
 
-      //             customerPayment.setCurrentSublistValue({ sublistId: 'apply', fieldId: 'amount', value: spsPaidAmount });
+            log.debug('payment_id', payment_id)
 
-      //             customerPayment.commitLine({ sublistId: 'apply' });
+            break;
+          }
+        }
 
-      //             var payment_id = customerPayment.save({
-      //                 enableSourcing: true,
-      //                 ignoreMandatoryFields: true
-      //             });
-
-      //             log.debug('payment_id', payment_id);
-
-      //             break;
-      //         }
-      //     }
-      // }
+        if (_logValidation(payment_id)) {
+          mapContext.write(mapContextParse.internalidSps, true)
+        }
+      }
     } catch (e) {
       log.error('Error in map', e.toString())
     }
   }
 
-  function reduce (reduceContext) {}
+  function reduce (reduceContext) {
+    log.debug('reduceContext', reduceContext);
+  }
 
   function summarize (summaryContext) {}
 
@@ -288,8 +312,8 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
 
   return {
     getInputData: getInputData,
-    map: map
-    // reduce: reduce,
+    map: map,
+    reduce: reduce,
     // summarize: summarize
   }
 })
