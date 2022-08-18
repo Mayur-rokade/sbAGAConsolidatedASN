@@ -8,7 +8,8 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
  * @param{redirect} redirect
  * @param{runtime} runtime
  * @param{search} search
- */ function (format, record, redirect, runtime, search) {
+ */
+function (format, record, redirect, runtime, search) {
   function getInputData () {
     try {
       var finalSearchResults = []
@@ -82,7 +83,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
         })
 
         finalSearchResults.push({
-          lineNo: i,
+          lineNumber: i,
           invoiceNumber: invoiceNumber,
           originalAmt: originalAmt,
           discAmountTaken: discAmountTaken,
@@ -91,16 +92,11 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
           internalidSps: internalidSps
         })
 
-        if (i !== searchResultSpsLength - 1) {
-          invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
-        } else {
-          invoiceNumberArr.push(['numbertext', 'is', invoiceNumber])
-        }
+        invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
       }
+      invoiceNumberArr.pop()
 
-      //invoiceNumberArr.pop()
-      //log.debug('finalSearchResults', finalSearchResults)
-      //log.debug('invoiceNumberArr', invoiceNumberArr)
+      log.debug('finalSearchResults', finalSearchResults)
 
       var invoiceSearch = search.create({
         type: 'invoice',
@@ -123,47 +119,46 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
       })
 
       var searchResultInv = searchAll(invoiceSearch.run())
-      //log.debug('searchResultInv', searchResultInv)
+      // log.debug("searchResultInv", searchResultInv)
+
+      var finalInvResults = []
 
       let invoiceResultLength = searchResultInv.length
 
       for (let i = 0; i < invoiceResultLength; i++) {
-        var tranid = searchResultInv[i].getValue({
+        let tranid = searchResultInv[i].getValue({
           name: 'tranid',
           label: 'Document Number'
         })
-        var customer = searchResultInv[i].getValue({
-          name: 'entity',
-          label: 'Name'
-        })
-        var internalid = searchResultInv[i].getValue({
-          name: 'internalid',
-          label: 'Internal ID'
-        })
-        var transactionname = searchResultInv[i].getValue({
-          name: 'transactionname',
-          label: 'Transaction Name'
-        })
 
-        var fileterRes = finalSearchResults.filter(
-          x => x.invoiceNumber === tranid
-        )
-
-        for (const iterator of fileterRes) {
-          let obj = finalSearchResults[iterator.lineNo]
-          obj.invoiceId = tranid
-          obj.customerId = customer
-          obj.internalid = internalid
-          obj.transactionname = transactionname
-          log.debug('obj', obj)
-          finalSearchResults[iterator.lineNo] = obj
-        }
-
-        //log.debug('fileteRes', fileterRes)
+        finalSearchResults.forEach(invNum => {
+          if (invNum.invoiceNumber === tranid) {
+            finalInvResults.push({
+              tranid: searchResultInv[i].getValue({
+                name: 'tranid',
+                label: 'Document Number'
+              }),
+              customer: searchResultInv[i].getValue({
+                name: 'entity',
+                label: 'Name'
+              }),
+              internalid: searchResultInv[i].getValue({
+                name: 'internalid',
+                label: 'Internal ID'
+              }),
+              transactionname: searchResultInv[i].getValue({
+                name: 'transactionname',
+                label: 'Transaction Name'
+              }),
+              finalSearchResults: finalSearchResults
+            })
+          }
+        })
       }
-      log.debug('finalSearchResults', finalSearchResults)
 
-      return finalSearchResults
+      log.debug('finalInvResults', finalInvResults)
+
+      return finalInvResults
     } catch (e) {
       log.error('Error in getinputdata', e.toString())
     }
