@@ -190,9 +190,9 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
       //log.debug('invoiceNumber', invoiceNumber);
 
       if (
-        _logValidation(invoiceId) ||
-        (_logValidation(customerInv) && _logValidation(spsPaidAmount)) ||
-        _logValidation(invoiceNumber)
+        _logValidation(invoiceId) &&
+        ((_logValidation(customerInv) && _logValidation(spsPaidAmount)) ||
+          _logValidation(invoiceNumber))
       ) {
         var customerPayment = record.transform({
           fromType: 'invoice',
@@ -248,7 +248,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
 
             log.debug('payment_id', payment_id)
 
-            break;
+            break
           }
         }
 
@@ -262,7 +262,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   }
 
   function reduce (reduceContext) {
-    log.debug('reduceContext', reduceContext);
+    log.debug('reduceContext', reduceContext)
   }
 
   function summarize (summaryContext) {}
@@ -313,7 +313,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   return {
     getInputData: getInputData,
     map: map,
-    reduce: reduce,
+    reduce: reduce
     // summarize: summarize
   }
 })
