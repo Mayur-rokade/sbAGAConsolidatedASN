@@ -20,7 +20,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
           'AND',
           ['mainline', 'is', 'F'],
           'AND',
-          ['internalid', 'anyof', '1387566']
+          ['internalid', 'anyof', '1387969']
         ],
         columns: [
           search.createColumn({
@@ -109,70 +109,68 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
       //log.debug('finalSearchResults', finalSearchResults)
       //log.debug('invoiceNumberArr', invoiceNumberArr)
 
-      if (invoiceNumberArr.length != 0) {
-        var invoiceSearch = search.create({
-          type: 'invoice',
-          filters: [
-            ['type', 'anyof', 'CustInvc'],
-            'AND',
-            invoiceNumberArr,
-            'AND',
-            ['mainline', 'is', 'T']
-          ],
-          columns: [
-            search.createColumn({ name: 'tranid', label: 'Document Number' }),
-            search.createColumn({ name: 'entity', label: 'Name' }),
-            search.createColumn({ name: 'internalid', label: 'Internal ID' }),
-            search.createColumn({
-              name: 'transactionname',
-              label: 'Transaction Name'
-            })
-          ]
-        })
-
-        var searchResultInv = searchAll(invoiceSearch.run())
-        //log.debug('searchResultInv', searchResultInv)
-
-        let invoiceResultLength = searchResultInv.length
-
-        for (let i = 0; i < invoiceResultLength; i++) {
-          var tranid = searchResultInv[i].getValue({
-            name: 'tranid',
-            label: 'Document Number'
-          })
-          var customer = searchResultInv[i].getValue({
-            name: 'entity',
-            label: 'Name'
-          })
-          var internalid = searchResultInv[i].getValue({
-            name: 'internalid',
-            label: 'Internal ID'
-          })
-          var transactionname = searchResultInv[i].getValue({
+      var invoiceSearch = search.create({
+        type: 'invoice',
+        filters: [
+          ['type', 'anyof', 'CustInvc'],
+          'AND',
+          invoiceNumberArr,
+          'AND',
+          ['mainline', 'is', 'T']
+        ],
+        columns: [
+          search.createColumn({ name: 'tranid', label: 'Document Number' }),
+          search.createColumn({ name: 'entity', label: 'Name' }),
+          search.createColumn({ name: 'internalid', label: 'Internal ID' }),
+          search.createColumn({
             name: 'transactionname',
             label: 'Transaction Name'
           })
-          //log.debug('tranid', tranid)
+        ]
+      })
 
-          var fileterRes = finalSearchResults.filter(
-            x => x.invoiceNumber === tranid
-          )
+      var searchResultInv = searchAll(invoiceSearch.run())
+      //log.debug('searchResultInv', searchResultInv)
 
-          for (const iterator of fileterRes) {
-            let obj = finalSearchResults[iterator.lineNo]
-            //   log.debug('obj', obj)
-            obj.invoiceId = tranid
-            obj.customerId = customer
-            obj.internalid = internalid
-            obj.transactionname = transactionname
-            //log.debug('obj', obj)
-            finalSearchResults[iterator.lineNo] = obj
-          }
+      let invoiceResultLength = searchResultInv.length
 
-          //log.debug('fileteRes', fileterRes)
+      for (let i = 0; i < invoiceResultLength; i++) {
+        var tranid = searchResultInv[i].getValue({
+          name: 'tranid',
+          label: 'Document Number'
+        })
+        var customer = searchResultInv[i].getValue({
+          name: 'entity',
+          label: 'Name'
+        })
+        var internalid = searchResultInv[i].getValue({
+          name: 'internalid',
+          label: 'Internal ID'
+        })
+        var transactionname = searchResultInv[i].getValue({
+          name: 'transactionname',
+          label: 'Transaction Name'
+        })
+        //log.debug('tranid', tranid)
+
+        var fileterRes = finalSearchResults.filter(
+          x => x.invoiceNumber === tranid
+        )
+
+        for (const iterator of fileterRes) {
+          let obj = finalSearchResults[iterator.lineNo]
+          //   log.debug('obj', obj)
+          obj.invoiceId = tranid
+          obj.customerId = customer
+          obj.internalid = internalid
+          obj.transactionname = transactionname
+          //   log.debug('obj', obj)
+          finalSearchResults[iterator.lineNo] = obj
         }
-        //log.debug('finalSearchResults', finalSearchResults)
+
+        //log.debug('fileteRes', fileterRes)
       }
+      //log.debug('finalSearchResults', finalSearchResults)
 
       return finalSearchResults
     } catch (e) {
@@ -206,7 +204,8 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
         var customerPayment = record.transform({
           fromType: 'invoice',
           fromId: invoiceId,
-          toType: 'customerPayment'
+          toType: 'customerPayment',
+          isDynamic: true
         })
         // log.debug('customerPayment', customerPayment)
 
@@ -220,39 +219,52 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
           value: spsPaidAmount
         })
 
-        let lineNo = customerPayment.findSublistLineWithValue({
-          sublistId: 'apply',
-          fieldId: 'refnum',
-          value: invoiceNumber
+        let applyLineCount = customerPayment.getLineCount({
+          sublistId: 'apply'
         })
+        // log.debug('applyLineCount', applyLineCount)
 
-        customerPayment.setSublistValue({
-          sublistId: 'apply',
-          fieldId: 'apply',
-          line: lineNo,
-          value: true
-        })
+        for (let i = 0; i < applyLineCount; i++) {
+          let refNum = customerPayment.getSublistValue({
+            sublistId: 'apply',
+            fieldId: 'refnum',
+            line: i
+          })
 
-        customerPayment.setSublistValue({
-          sublistId: 'apply',
-          fieldId: 'amount',
-          line: lineNo,
-          value: spsPaidAmount
-        })
+          if (refNum == invoiceNumber) {
+            customerPayment.selectLine({ sublistId: 'apply', line: i })
 
-        var payment_id = customerPayment.save({
-          enableSourcing: true,
-          ignoreMandatoryFields: true
-        })
-        log.debug('payment_id', payment_id)
+            customerPayment.setCurrentSublistValue({
+              sublistId: 'apply',
+              fieldId: 'apply',
+              value: true
+            })
+
+            customerPayment.setCurrentSublistValue({
+              sublistId: 'apply',
+              fieldId: 'amount',
+              value: spsPaidAmount
+            })
+
+            customerPayment.commitLine({ sublistId: 'apply' })
+
+            var payment_id = customerPayment.save({
+              enableSourcing: true,
+              ignoreMandatoryFields: true
+            })
+
+            log.debug('payment_id', payment_id)
+
+            break
+          }
+        }
 
         if (_logValidation(payment_id)) {
           mapContext.write({
             key: mapContextParse.internalidSps,
             value: {
               lineId: mapContextParse.lineId,
-              invoiceNumber: mapContextParse.invoiceNumber,
-              payment_id: payment_id
+              invoiceNumber: mapContextParse.invoiceNumber
             }
           })
         }
@@ -265,28 +277,31 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   function reduce (reduceContext) {
     try {
       log.debug('reduceContext', reduceContext)
-      //log.debug('reduceContext key', reduceContext.key)
+      log.debug('reduceContext key', reduceContext.key)
+      log.debug('reduceContext values', JSON.parse(reduceContext.values))
+
       var spsRecId = reduceContext.key
-      var spsInvDocNum = parseReducedRecords(reduceContext)
+      var spsInvDocNum = reduceContext.values
 
       var loadSpsRecord = record.load({
         type: 'customtransaction_sps_cx_820_basic',
         id: spsRecId
+        //isDynamic: true
       })
 
       let spsInvDocNumLength = spsInvDocNum.length
       //log.debug('spsInvDocNumLength', spsInvDocNumLength)
 
       for (let i = 0; i < spsInvDocNumLength; i++) {
-        let spsInvDocNumVal = spsInvDocNum[i].lineId
-        //log.debug('spsInvDocNumVal', spsInvDocNumVal)
+        let spsInvDocNumVal = spsInvDocNum.lineId
+        log.debug('spsInvDocNumVal', spsInvDocNumVal)
 
         var lineNumber = loadSpsRecord.findSublistLineWithValue({
           sublistId: 'line',
           fieldId: 'line',
           value: spsInvDocNumVal
         })
-        //log.debug('lineNumber', lineNumber)
+        log.debug('lineNumber', lineNumber);
 
         let getCheckboxVal = loadSpsRecord.getSublistValue({
           sublistId: 'line',
@@ -310,46 +325,12 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
       })
 
       log.debug('spsRecId', spsRecId)
-      reduceContext.write({
-        key: spsRecId,
-        value: spsInvDocNum
-      })
     } catch (e) {
       log.error('Error in reduce', e.toString())
     }
   }
 
-  function parseReducedRecords (reduceContext) {
-    let reduceContextParse = []
-    for (let j = 0; j < reduceContext.values.length; j++) {
-      //log.debug('reduceContext.values[j]', reduceContext.values[j])
-      let parsedObject = JSON.parse(reduceContext.values[j])
-      //log.debug('parsedObject', parsedObject)
-      reduceContextParse.push(parsedObject)
-    }
-    //log.debug('reduceContextParse', reduceContextParse)
-    return reduceContextParse
-  }
-
-  function summarize (context) {
-    try {
-      context.output.iterator().each(function (key, value) {
-        log.debug('key', key);
-        log.debug('value', value);
-        value = JSON.parse(value);
-        for (const iterator of value) {
-          log.debug('iterator', iterator)
-          record.delete({
-            type: 'customerpayment',
-            id: iterator.payment_id
-          })
-        }
-        return true
-      })
-    } catch (error) {
-      log.error('error in summarize', error)
-    }
-  }
+  function summarize (summaryContext) {}
 
   function _logValidation (value) {
     if (
@@ -397,7 +378,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   return {
     getInputData: getInputData,
     map: map,
-    reduce: reduce,
-    summarize: summarize
+    reduce: reduce
+    // summarize: summarize
   }
 })
