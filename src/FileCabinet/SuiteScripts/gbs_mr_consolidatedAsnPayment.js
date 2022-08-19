@@ -2,7 +2,7 @@
  * @NApiVersion 2.1
  * @NScriptType MapReduceScript
  */
- define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
+define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
  * @param{format} format
  * @param{record} record
  * @param{redirect} redirect
@@ -44,9 +44,9 @@
             label: 'SPS CX Net Paid Amount'
           }),
           search.createColumn({ name: 'internalid', label: 'Internal ID' }),
-          search.createColumn({name: "line", label: "Line ID"})
+          search.createColumn({ name: 'line', label: 'Line ID' })
         ]
-      });
+      })
 
       var searchResultSps = searchAll(transactionSearchObj.run())
 
@@ -83,10 +83,9 @@
         })
 
         var lineId = searchResultSps[i].getValue({
-            name: 'line',
-            label: 'Line ID'
+          name: 'line',
+          label: 'Line ID'
         })
-
 
         finalSearchResults.push({
           lineNo: i,
@@ -161,12 +160,12 @@
 
         for (const iterator of fileterRes) {
           let obj = finalSearchResults[iterator.lineNo]
-        //   log.debug('obj', obj)
+          //   log.debug('obj', obj)
           obj.invoiceId = tranid
           obj.customerId = customer
           obj.internalid = internalid
           obj.transactionname = transactionname
-        //   log.debug('obj', obj)
+          //   log.debug('obj', obj)
           finalSearchResults[iterator.lineNo] = obj
         }
 
@@ -176,7 +175,7 @@
 
       return finalSearchResults
     } catch (e) {
-      log.error('Error in getinputdata', e.toString());
+      log.error('Error in getinputdata', e.toString())
     }
   }
 
@@ -186,22 +185,20 @@
       log.debug('mapContextParse', mapContextParse)
 
       let invoiceId = mapContextParse.internalid
-      log.debug('invoiceId', invoiceId);
+      log.debug('invoiceId', invoiceId)
 
       let customerInv = mapContextParse.customerId
-      log.debug('customerInv', customerInv);
+      log.debug('customerInv', customerInv)
 
       let spsPaidAmount = mapContextParse.netPaidAmt
-      log.debug('spsPaidAmount', spsPaidAmount);
+      log.debug('spsPaidAmount', spsPaidAmount)
 
       let invoiceNumber = mapContextParse.invoiceNumber
-      log.debug('invoiceNumber', invoiceNumber);
-
-
+      log.debug('invoiceNumber', invoiceNumber)
 
       if (
         _logValidation(invoiceId) &&
-        (_logValidation(customerInv) && _logValidation(spsPaidAmount)) &&
+        _logValidation(customerInv) && _logValidation(spsPaidAmount) &&
         _logValidation(invoiceNumber)
       ) {
         var customerPayment = record.transform({
@@ -210,7 +207,7 @@
           toType: 'customerPayment',
           isDynamic: true
         })
-        log.debug('customerPayment', customerPayment);
+        log.debug('customerPayment', customerPayment)
 
         customerPayment.setValue({
           fieldId: 'customer',
@@ -225,7 +222,7 @@
         let applyLineCount = customerPayment.getLineCount({
           sublistId: 'apply'
         })
-        log.debug('applyLineCount', applyLineCount);
+        log.debug('applyLineCount', applyLineCount)
 
         for (let i = 0; i < applyLineCount; i++) {
           let refNum = customerPayment.getSublistValue({
@@ -258,19 +255,18 @@
 
             log.debug('payment_id', payment_id)
 
-            break;
+            break
           }
         }
 
         if (_logValidation(payment_id)) {
-
-            mapContext.write({
-                key: mapContextParse.internalidSps,
-                value: {
-                    lineId: mapContextParse.lineId,
-                    invoiceNumber: mapContextParse.invoiceNumber,
-                }
-            })
+          mapContext.write({
+            key: mapContextParse.internalidSps,
+            value: {
+              lineId: mapContextParse.lineId,
+              invoiceNumber: mapContextParse.invoiceNumber
+            }
+          })
         }
       }
     } catch (e) {
@@ -279,84 +275,75 @@
   }
 
   function reduce (reduceContext) {
-    try{
+    try {
+      log.debug('reduceContext', reduceContext)
 
-    log.debug('reduceContext', reduceContext);
+      log.debug('reduceContext key', reduceContext.key)
 
-    log.debug('reduceContext key', reduceContext.key);
+      log.debug('reduceContext values', JSON.parse(reduceContext.values))
 
-    log.debug('reduceContext values', JSON.parse(reduceContext.values));
+      var reduceParse = JSON.parse(reduceContext.values)
 
-        
-    var reduceParse = JSON.parse(reduceContext.values)
+      var spsRecId = reduceContext.key
+      var spsInvDocNum = reduceContext.values
 
-    var spsRecId = reduceContext.key;
-    var spsInvDocNum = reduceContext.values;
-
-    var loadSpsRecord = record.load({
+      var loadSpsRecord = record.load({
         type: 'customtransaction_sps_cx_820_basic',
         id: spsRecId,
         isDynamic: true
+      })
+
+      let spsInvDocNumLength = spsInvDocNum.length
+      log.debug('spsInvDocNumLength', spsInvDocNumLength)
+
+      for (let i = 0; i < spsInvDocNumLength; i++) {
+        let spsInvDocNumVal = spsInvDocNum.lineId
+        log.debug('spsInvDocNumVal', spsInvDocNumVal)
+
+        var lineNumber = loadSpsRecord.findSublistLineWithValue({
+          sublistId: 'line',
+          fieldId: 'line',
+          value: spsInvDocNumVal
         })
-    
-        let spsInvDocNumLength = spsInvDocNum.length;
-        log.debug('spsInvDocNumLength', spsInvDocNumLength);
 
-        for(let i=0;i<spsInvDocNumLength;i++){
+        log.debug('lineNumber', lineNumber)
 
-            let spsInvDocNumVal = spsInvDocNum.lineId;
-            log.debug('spsInvDocNumVal', spsInvDocNumVal);
+        log.debug('lineNumber inside', lineNumber)
 
-            var lineNumber = loadSpsRecord.findSublistLineWithValue({
-                sublistId: 'line',
-                fieldId: 'line',
-                value: spsInvDocNumVal
-            });
+        var lineSel = loadSpsRecord.selectLine({
+          sublistId: 'line',
+          line: lineNumber
+        })
 
-            log.debug('lineNumber', lineNumber);
+        log.debug('lineSel', lineSel)
 
-                log.debug('lineNumber inside', lineNumber);
+        let getCheckboxVal = loadSpsRecord.getCurrentSublistValue({
+          sublistId: 'line',
+          fieldId: 'custcol_gbs_ispaymentcreate'
+        })
 
-               var lineSel = loadSpsRecord.selectLine({
-                    sublistId: 'line',
-                    line: lineNumber
-                });
-
-                log.debug('lineSel', lineSel);
-
-                let getCheckboxVal = loadSpsRecord.getCurrentSublistValue({
-                    sublistId: 'line',
-                    fieldId: 'custcol_gbs_ispaymentcreate'
-                });
-
-                if(getCheckboxVal == false){
-
-                loadSpsRecord.setCurrentSublistValue({
-                    sublistId: 'line',
-                    fieldId: 'custcol_gbs_ispaymentcreate',
-                    value: true
-                });
-
-            }
-
-                loadSpsRecord.commitLine({
-                    sublistId: 'line'
-                });
-
+        if (getCheckboxVal == false) {
+          loadSpsRecord.setCurrentSublistValue({
+            sublistId: 'line',
+            fieldId: 'custcol_gbs_ispaymentcreate',
+            value: true
+          })
         }
 
-        var spsRecId = loadSpsRecord.save({
-            enableSourcing: true,
-            ignoreMandatoryFields: true
-        });
+        loadSpsRecord.commitLine({
+          sublistId: 'line'
+        })
+      }
 
-        log.debug('spsRecId', spsRecId);
+      var spsRecId = loadSpsRecord.save({
+        enableSourcing: true,
+        ignoreMandatoryFields: true
+      })
 
+      log.debug('spsRecId', spsRecId)
+    } catch (e) {
+      log.error('Error in reduce', e.toString())
     }
-    catch(e){
-        log.error('Error in reduce', e.toString())
-        }
-
   }
 
   function summarize (summaryContext) {}
@@ -407,7 +394,7 @@
   return {
     getInputData: getInputData,
     map: map,
-    reduce: reduce,
+    reduce: reduce
     // summarize: summarize
   }
 })
