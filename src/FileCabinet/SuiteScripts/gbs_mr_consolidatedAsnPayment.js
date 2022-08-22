@@ -2,13 +2,20 @@
  * @NApiVersion 2.1
  * @NScriptType MapReduceScript
  */
-define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
+define([
+  'N/format',
+  'N/record',
+  'N/redirect',
+  'N/runtime',
+  'N/search',
+  'N/file'
+], /**
  * @param{format} format
  * @param{record} record
  * @param{redirect} redirect
  * @param{runtime} runtime
  * @param{search} search
- */ function (format, record, redirect, runtime, search) {
+ */ function (format, record, redirect, runtime, search, file) {
   function getInputData () {
     try {
       var finalSearchResults = []
@@ -118,6 +125,8 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
             invoiceNumberArr,
             'AND',
             ['mainline', 'is', 'T']
+            // 'AND',
+            // ['internalid', 'anyof', '758561']
           ],
           columns: [
             search.createColumn({ name: 'tranid', label: 'Document Number' }),
@@ -195,7 +204,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
       //log.debug('spsPaidAmount', spsPaidAmount)
 
       let invoiceNumber = mapContextParse.invoiceNumber
-      //log.debug('invoiceNumber', invoiceNumber)
+      log.debug('invoiceNumber', invoiceNumber)
 
       if (
         _logValidation(invoiceId) &&
@@ -203,59 +212,156 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
         _logValidation(spsPaidAmount) &&
         _logValidation(invoiceNumber)
       ) {
-        var customerPayment = record.transform({
-          fromType: 'invoice',
+        var objRecord3 = record.transform({
+          fromType: record.Type.INVOICE,
           fromId: invoiceId,
-          toType: 'customerPayment'
-        })
-        // log.debug('customerPayment', customerPayment)
-
-        customerPayment.setValue({
-          fieldId: 'customer',
-          value: customerInv
+          toType: record.Type.CUSTOMER_PAYMENT,
+          isDynamic: false
         })
 
-        customerPayment.setValue({
-          fieldId: 'payment',
-          value: spsPaidAmount
-        })
+        // var linecount = objRecord3.getLineCount({
+        //   sublistId: 'apply'
+        // })
+        // log.debug('linecount', linecount)
+        //invoiceNumber = '202643912';
 
-        let lineNo = customerPayment.findSublistLineWithValue({
+        let lineNo = objRecord3.findSublistLineWithValue({
           sublistId: 'apply',
           fieldId: 'refnum',
           value: invoiceNumber
         })
+        log.debug('lineNo', lineNo)
 
-        customerPayment.setSublistValue({
-          sublistId: 'apply',
-          fieldId: 'apply',
-          line: lineNo,
-          value: true
-        })
+        // for (var i = 1; i < linecount; i++) {
+        //   var refnum = objRecord3.getSublistValue({
+        //     sublistId: 'apply',
+        //     fieldId: 'refnum',
+        //     line: i
+        //   })
+        //   //log.debug('refnum', refnum);
 
-        customerPayment.setSublistValue({
-          sublistId: 'apply',
-          fieldId: 'amount',
-          line: lineNo,
-          value: spsPaidAmount
-        })
+        //   if (refnum == invoiceNumber) {
 
-        var payment_id = customerPayment.save({
-          enableSourcing: true,
-          ignoreMandatoryFields: true
-        })
-        log.debug('payment_id', payment_id)
-
-        if (_logValidation(payment_id)) {
-          mapContext.write({
-            key: mapContextParse.internalidSps,
-            value: {
-              lineId: mapContextParse.lineId,
-              invoiceNumber: mapContextParse.invoiceNumber,
-              payment_id: payment_id
-            }
+        if (lineNo != -1) {
+          objRecord3.setValue({
+            fieldId: 'payment',
+            value: spsPaidAmount
           })
+
+          objRecord3.setSublistValue({
+            sublistId: 'apply',
+            fieldId: 'apply',
+            line: lineNo,
+            value: true
+          })
+
+          var rid3 = objRecord3.save({
+            enableSourcing: true,
+            ignoreMandatoryFields: true
+          })
+          log.debug('rid3', rid3)
         }
+
+        //   }
+        // }
+
+        
+
+        // var customerPayment = record.transform({
+        //   fromType: 'invoice',
+        //   fromId: invoiceId,
+        //   toType: 'customerPayment'
+        //   //isDynamic: true,
+        // })
+        // log.debug('customerPayment', customerPayment)
+
+        // var files = file.create({
+        //   name: 'customerPayment',
+        //   fileType: file.Type.PLAINTEXT,
+        //   contents: JSON.stringify(customerPayment),
+        //   folder: 2244
+        // })
+
+        // files.save()
+
+        // customerPayment.setValue({
+        //   fieldId: 'customer',
+        //   value: customerInv
+        // })
+
+        // customerPayment.setValue({
+        //   fieldId: 'payment',
+        //   value: spsPaidAmount
+        // })
+
+        // customerPayment.setValue({
+        //   fieldId: 'autoenter',
+        //   value: invoiceId
+        // })
+
+        // customerPayment.setValue({
+        //   fieldId: 'apply_Transaction_TRANDATE',
+        //   value: '4/27/2022',
+        // })
+
+        // customerPayment.setValue({
+        //   fieldId: 'apply_Transaction_TRANDATE',
+        //   value: '4/27/2022',
+        // })
+
+        // let lineNo = customerPayment.findSublistLineWithValue({
+        //   sublistId: 'apply',
+        //   fieldId: 'refnum',
+        //   value: invoiceNumber
+        // })
+
+        // let lineN1o = customerPayment.findSublistLineWithValue({
+        //   sublistId: 'apply',
+        //   fieldId: 'doc',
+        //   value: invoiceId
+        // })
+
+        // log.debug('lineNo', lineNo)
+        // log.debug('lineN1o', lineN1o)
+        // log.debug(
+        //   'internalid',
+        //   customerPayment.findSublistLineWithValue({
+        //     sublistId: 'apply',
+        //     fieldId: 'internalid',
+        //     value: invoiceId
+        //   })
+        // )
+
+        // customerPayment.setSublistValue({
+        //   sublistId: 'apply',
+        //   fieldId: 'apply',
+        //   line: lineNo,
+        //   value: true
+        // })
+
+        // customerPayment.setSublistValue({
+        //   sublistId: 'apply',
+        //   fieldId: 'amount',
+        //   line: lineNo,
+        //   value: spsPaidAmount
+        // })
+
+        // var payment_id = customerPayment.save({
+        //   enableSourcing: true,
+        //   ignoreMandatoryFields: true
+        // })
+        // log.debug('payment_id', payment_id)
+
+        // if (_logValidation(payment_id)) {
+        //   mapContext.write({
+        //     key: mapContextParse.internalidSps,
+        //     value: {
+        //       lineId: mapContextParse.lineId,
+        //       invoiceNumber: mapContextParse.invoiceNumber,
+        //       payment_id: payment_id
+        //     }
+        //   })
+        // }
       }
     } catch (e) {
       log.error('Error in map', e.toString())
@@ -264,7 +370,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
 
   function reduce (reduceContext) {
     try {
-      log.debug('reduceContext', reduceContext)
+      //log.debug('reduceContext', reduceContext)
       //log.debug('reduceContext key', reduceContext.key)
       var spsRecId = reduceContext.key
       var spsInvDocNum = parseReducedRecords(reduceContext)
@@ -309,7 +415,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
         ignoreMandatoryFields: true
       })
 
-      log.debug('spsRecId', spsRecId)
+      //log.debug('spsRecId', spsRecId)
       reduceContext.write({
         key: spsRecId,
         value: spsInvDocNum
@@ -334,9 +440,9 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   function summarize (context) {
     try {
       context.output.iterator().each(function (key, value) {
-        log.debug('key', key);
-        log.debug('value', value);
-        value = JSON.parse(value);
+        log.debug('key', key)
+        log.debug('value', value)
+        value = JSON.parse(value)
         for (const iterator of value) {
           log.debug('iterator', iterator)
           record.delete({
@@ -397,7 +503,7 @@ define(['N/format', 'N/record', 'N/redirect', 'N/runtime', 'N/search'], /**
   return {
     getInputData: getInputData,
     map: map,
-    reduce: reduce,
-    summarize: summarize
+    reduce: reduce
+    //summarize: summarize
   }
 })
