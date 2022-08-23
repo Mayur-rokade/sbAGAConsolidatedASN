@@ -22,8 +22,15 @@ define([
   'N/runtime',
   'N/search',
   'N/email',
-  'N/runtime'
-], function (record, runtime, search, email, runtime) {
+  'N/runtime',
+  'N/url'
+], function (record, runtime, search, email, runtime, url) {
+  /**
+   * @date 2022-08-23
+   * @description - Gets all the [SPS] 820 Payment Order Custom Records and the Document Numbers for Invoices and
+   * creates payment order for them
+   * @returns {invoices} - Invoices to create payment order for does not return Invoices which are already paid in full.
+   */
   function getInputData () {
     try {
       var finalSearchResults = []
@@ -109,6 +116,8 @@ define([
             invoiceNumberArr,
             'AND',
             ['mainline', 'is', 'T']
+            // 'AND',
+            // ['status', 'noneof', 'CustInvc:B']
           ],
           columns: [
             search.createColumn({ name: 'tranid', label: 'Document Number' }),
@@ -135,26 +144,20 @@ define([
             status
           } = getInvoiceSearchFields(searchResultInv, i)
           //log.debug('status', status)
-          if (status === 'paidInFull') {
-            log.audit(
-              'Invoice with Document Number is already Paid In Full',
-              tranid
-            )
-          } else {
-            var fileterRes = finalSearchResults.filter(
-              x => x.invoiceNumber === tranid
-            )
 
-            for (const iterator of fileterRes) {
-              let obj = finalSearchResults[iterator.lineNo]
+          var fileterRes = finalSearchResults.filter(
+            x => x.invoiceNumber === tranid
+          )
 
-              obj.invoiceId = tranid
-              obj.customerId = customer
-              obj.internalid = internalid
-              obj.transactionname = transactionname
+          for (const iterator of fileterRes) {
+            let obj = finalSearchResults[iterator.lineNo]
 
-              finalSearchResults[iterator.lineNo] = obj
-            }
+            obj.invoiceId = tranid
+            obj.customerId = customer
+            obj.internalid = internalid
+            obj.transactionname = transactionname
+            obj.status = status
+            finalSearchResults[iterator.lineNo] = obj
           }
         }
       }
@@ -182,8 +185,19 @@ define([
       let spsPaidAmount = mapContextParse.netPaidAmt
 
       let invoiceNumber = mapContextParse.invoiceNumber
+      let status = mapContextParse.status
 
-      if (
+      if (status === 'paidInFull') {
+        mapContext.write({
+          key: mapContextParse.internalidSps,
+          value: {
+            lineId: mapContextParse.lineId,
+            bool: true,
+            invoiceNumber: mapContextParse.invoiceNumber,
+            alreadyCreated: true
+          }
+        })
+      } else if (
         _logValidation(invoiceId) &&
         _logValidation(customerInv) &&
         _logValidation(spsPaidAmount) &&
@@ -215,6 +229,13 @@ define([
             fieldId: 'apply',
             line: lineNo,
             value: true
+          })
+
+          objRecord3.setSublistValue({
+            sublistId: 'apply',
+            fieldId: 'amount',
+            line: lineNo,
+            value: spsPaidAmount
           })
 
           var payment_id = objRecord3.save({
@@ -261,6 +282,12 @@ define([
     }
   }
 
+  /**
+   * @date 2022-08-23
+   * @description - Update [SPS] 820 Payment Order line whether the payment record was created or not for the given
+   * document number on [SPS] 820 Payment Order
+   * @param {object} reduceContext
+   */
   function reduce (reduceContext) {
     try {
       var spsRecId = reduceContext.key
@@ -295,6 +322,7 @@ define([
           value: spsInvDocNum[i].bool,
           line: lineNumber
         })
+
         //}
       }
 
@@ -321,32 +349,52 @@ define([
    */
   function summarize (context) {
     try {
+      let body = `Dear User, 
 
-      let body = ''
+                     [SPS] 820 Payment Order Custom Record has been Processed with following payment records created. 
+                     Please click on the link to navigate to the payment record.
+                     
+                     `
+
+      var accountID = runtime.accountId
+      var resolvedDomain = url.resolveDomain({
+        hostType: url.HostType.APPLICATION,
+        accountId: accountID
+      })
+      resolvedDomain = 'https://' + '' + resolvedDomain
       context.output.iterator().each(function (key, value) {
         //log.debug('key', key)
         //log.debug('value', value)
         value = JSON.parse(value)
         for (const iterator of value) {
-          var paymentUrl = url.resolveRecord({
-            recordType: 'customerpayment',
-            recordId: iterator.payment_id,
-            isEditMode: false
-          })
-          body += `Payment record created with Internal ID ${iterator.payment_id}: ${paymentUrl} \n`
-          //log.debug('iterator', iterator)
-          // record.delete({
-          //   type: 'customerpayment',
-          //   id: iterator.payment_id
-          // })
+          //log.debug('alreadyCreated', iterator.alreadyCreated)
+          if (iterator.alreadyCreated == 'true' || iterator.alreadyCreated == true) {
+            body += `Payment already created for invoice number ${iterator.invoiceNumber} \n`
+          } else {
+            var paymentUrl = url.resolveRecord({
+              recordType: 'customerpayment',
+              recordId: iterator.payment_id,
+              isEditMode: false
+            })
+            body += `Payment record created with Internal ID ${
+              iterator.payment_id
+            } for SPS Record ${key} with Document Number ${
+              iterator.invoiceNumber
+            }: ${resolvedDomain + paymentUrl} \n`
+            //log.debug('iterator', iterator)
+            // record.delete({
+            //   type: 'customerpayment',
+            //   id: iterator.payment_id
+            // })
+          }
         }
 
         email.send({
-          author: runtime.getCurrentUser().id,
+          author: 2362,
           body: body,
-          recipients: runtime.getCurrentUser().id,
-          subject: `[SPS] 820 Payment Order custom Record Processed Details`,
-        })
+          recipients: 2362,
+          subject: `[SPS] 820 Payment Order Custom Record Processed Details`
+        });
         return true
       })
     } catch (error) {
