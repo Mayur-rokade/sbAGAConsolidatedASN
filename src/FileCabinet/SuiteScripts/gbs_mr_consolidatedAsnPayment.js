@@ -2,20 +2,28 @@
  * @NApiVersion 2.1
  * @NScriptType MapReduceScript
  */
+
+// BEGIN SCRIPT DESCRIPTION BLOCK ==================================
+{
+  /*
+  Script Name: gbs_mr_consolidatedAsnPayment
+  Author: Palavi Rajgude
+  Description: Create Payment records from [SPS] 820 Payment Order custom Record
+  Company: Green Business System 
+  Date: 23-08-2022
+  Script Modification Log:
+  -- version--   -- Date --   -- Modified By --   --Requested By--    -- Description --
+       1.0       23-08-2022     Palavi Rajgude      Albert Grazi               
+  */
+}
+// END SCRIPT DESCRIPTION BLOCK ====================================
 define([
-  'N/format',
   'N/record',
-  'N/redirect',
   'N/runtime',
   'N/search',
-  'N/file'
-], /**
- * @param{format} format
- * @param{record} record
- * @param{redirect} redirect
- * @param{runtime} runtime
- * @param{search} search
- */ function (format, record, redirect, runtime, search, file) {
+  'N/email',
+  'N/runtime'
+], function (record, runtime, search, email, runtime) {
   function getInputData () {
     try {
       var finalSearchResults = []
@@ -27,7 +35,9 @@ define([
           'AND',
           ['mainline', 'is', 'F'],
           'AND',
-          ['internalid', 'anyof', '1387566']
+          ['internalid', 'anyof', '1387566'],
+          'AND',
+          ['custcol_gbs_ispaymentcreate', 'is', 'F']
         ],
         columns: [
           search.createColumn({
@@ -62,7 +72,15 @@ define([
       let invoiceNumberArr = []
 
       for (let i = 0; i < searchResultSpsLength; i++) {
-        var { invoiceNumber, originalAmt, discAmountTaken, adjAmount, netPaidAmt, internalidSps, lineId } = getSpsSearchFields(searchResultSps, i)
+        var {
+          invoiceNumber,
+          originalAmt,
+          discAmountTaken,
+          adjAmount,
+          netPaidAmt,
+          internalidSps,
+          lineId
+        } = getSpsSearchFields(searchResultSps, i)
 
         finalSearchResults.push({
           lineNo: i,
@@ -99,7 +117,8 @@ define([
             search.createColumn({
               name: 'transactionname',
               label: 'Transaction Name'
-            })
+            }),
+            search.createColumn({ name: 'statusref', label: 'Status' })
           ]
         })
 
@@ -108,21 +127,34 @@ define([
         let invoiceResultLength = searchResultInv.length
 
         for (let i = 0; i < invoiceResultLength; i++) {
-          var { tranid, customer, internalid, transactionname } = getInvoiceSearchFields(searchResultInv, i)
+          var {
+            tranid,
+            customer,
+            internalid,
+            transactionname,
+            status
+          } = getInvoiceSearchFields(searchResultInv, i)
+          //log.debug('status', status)
+          if (status === 'paidInFull') {
+            log.audit(
+              'Invoice with Document Number is already Paid In Full',
+              tranid
+            )
+          } else {
+            var fileterRes = finalSearchResults.filter(
+              x => x.invoiceNumber === tranid
+            )
 
-          var fileterRes = finalSearchResults.filter(
-            x => x.invoiceNumber === tranid
-          )
+            for (const iterator of fileterRes) {
+              let obj = finalSearchResults[iterator.lineNo]
 
-          for (const iterator of fileterRes) {
-            let obj = finalSearchResults[iterator.lineNo]
+              obj.invoiceId = tranid
+              obj.customerId = customer
+              obj.internalid = internalid
+              obj.transactionname = transactionname
 
-            obj.invoiceId = tranid
-            obj.customerId = customer
-            obj.internalid = internalid
-            obj.transactionname = transactionname
-
-            finalSearchResults[iterator.lineNo] = obj
+              finalSearchResults[iterator.lineNo] = obj
+            }
           }
         }
       }
@@ -133,59 +165,12 @@ define([
     }
   }
 
-   function getInvoiceSearchFields(searchResultInv, i) {
-     var tranid = searchResultInv[i].getValue({
-       name: 'tranid',
-       label: 'Document Number'
-     })
-     var customer = searchResultInv[i].getValue({
-       name: 'entity',
-       label: 'Name'
-     })
-     var internalid = searchResultInv[i].getValue({
-       name: 'internalid',
-       label: 'Internal ID'
-     })
-     var transactionname = searchResultInv[i].getValue({
-       name: 'transactionname',
-       label: 'Transaction Name'
-     })
-     return { tranid, customer, internalid, transactionname }
-   }
-
-   function getSpsSearchFields(searchResultSps, i) {
-     var invoiceNumber = searchResultSps[i].getValue({
-       name: 'custcol_sps_cx_invoicenumber',
-       label: 'SPS CX Invoice Number'
-     })
-     var originalAmt = searchResultSps[i].getValue({
-       name: 'custcol_sps_cx_originalamt',
-       label: 'SPS CX Amount (Pre-Discount)'
-     })
-     var discAmountTaken = searchResultSps[i].getValue({
-       name: 'custcol_sps_cx_disc_amounttaken',
-       label: 'SPS CX Remittance Discount'
-     })
-     var adjAmount = searchResultSps[i].getValue({
-       name: 'custcol_sps_cx_adjamount',
-       label: 'SPS CX Adjustment Amount'
-     })
-     var netPaidAmt = searchResultSps[i].getValue({
-       name: 'custcol_sps_cx_netpaidamt',
-       label: 'SPS CX Net Paid Amount'
-     })
-     var internalidSps = searchResultSps[i].getValue({
-       name: 'internalid',
-       label: 'Internal ID'
-     })
-
-     var lineId = searchResultSps[i].getValue({
-       name: 'line',
-       label: 'Line ID'
-     })
-     return { invoiceNumber, originalAmt, discAmountTaken, adjAmount, netPaidAmt, internalidSps, lineId }
-   }
-
+  /**
+   * @date 2022-08-23
+   * @description - Map function creates payment record for the relative invoice record from the SPS Custom Record
+   * @param {object} mapContext - Invoices from the SPS Record with respect to the invoice number on SPS record
+   * @returns {payment Internal ID} - Created payment record Internal ID
+   */
   function map (mapContext) {
     try {
       var mapContextParse = JSON.parse(mapContext.value)
@@ -197,7 +182,6 @@ define([
       let spsPaidAmount = mapContextParse.netPaidAmt
 
       let invoiceNumber = mapContextParse.invoiceNumber
-      log.debug('invoiceNumber', invoiceNumber)
 
       if (
         _logValidation(invoiceId) &&
@@ -217,7 +201,8 @@ define([
           fieldId: 'refnum',
           value: invoiceNumber
         })
-        log.debug('lineNo', lineNo)
+
+        log.debug(`Line found for ${invoiceId} on payment transform`, lineNo)
 
         if (lineNo != -1) {
           objRecord3.setValue({
@@ -236,9 +221,14 @@ define([
             enableSourcing: true,
             ignoreMandatoryFields: true
           })
-          log.debug('payment_id', payment_id)
+          //log.debug('payment_id', payment_id)
 
           if (_logValidation(payment_id)) {
+            log.audit(
+              `Payment record created for SPS Record --> ${mapContextParse.internalidSps}`,
+              `Invoice Number ${invoiceNumber} --> Payment Record ${payment_id}`
+            )
+
             mapContext.write({
               key: mapContextParse.internalidSps,
               value: {
@@ -250,15 +240,20 @@ define([
             })
           }
         } else {
-            mapContext.write({
-              key: mapContextParse.internalidSps,
-              value: {
-                lineId: mapContextParse.lineId,
-                bool: false,
-                invoiceNumber: mapContextParse.invoiceNumber,
-                payment_id: payment_id
-              }
-            })
+          log.audit(
+            `No valid payment record found for SPS Record --> ${mapContextParse.internalidSps}`,
+            `Invoice Number ${invoiceNumber}`
+          )
+
+          mapContext.write({
+            key: mapContextParse.internalidSps,
+            value: {
+              lineId: mapContextParse.lineId,
+              bool: false,
+              invoiceNumber: mapContextParse.invoiceNumber,
+              payment_id: payment_id
+            }
+          })
         }
       }
     } catch (e) {
@@ -294,12 +289,12 @@ define([
         // })
 
         //if (getCheckboxVal == false) {
-          loadSpsRecord.setSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
-            value: spsInvDocNum[i].bool,
-            line: lineNumber
-          })
+        loadSpsRecord.setSublistValue({
+          sublistId: 'line',
+          fieldId: 'custcol_gbs_ispaymentcreate',
+          value: spsInvDocNum[i].bool,
+          line: lineNumber
+        })
         //}
       }
 
@@ -307,6 +302,8 @@ define([
         enableSourcing: true,
         ignoreMandatoryFields: true
       })
+
+      log.debug('SPS Record with Internal ID updated --->', spsRecId)
 
       reduceContext.write({
         key: spsRecId,
@@ -317,6 +314,51 @@ define([
     }
   }
 
+  /**
+   * @date 2022-08-23
+   * @param {summary} context
+   * @returns {email} - Send email to the user who has executed the script
+   */
+  function summarize (context) {
+    try {
+
+      let body = ''
+      context.output.iterator().each(function (key, value) {
+        //log.debug('key', key)
+        //log.debug('value', value)
+        value = JSON.parse(value)
+        for (const iterator of value) {
+          var paymentUrl = url.resolveRecord({
+            recordType: 'customerpayment',
+            recordId: iterator.payment_id,
+            isEditMode: false
+          })
+          body += `Payment record created with Internal ID ${iterator.payment_id}: ${paymentUrl} \n`
+          //log.debug('iterator', iterator)
+          // record.delete({
+          //   type: 'customerpayment',
+          //   id: iterator.payment_id
+          // })
+        }
+
+        email.send({
+          author: runtime.getCurrentUser().id,
+          body: body,
+          recipients: runtime.getCurrentUser().id,
+          subject: `[SPS] 820 Payment Order custom Record Processed Details`,
+        })
+        return true
+      })
+    } catch (error) {
+      log.error('error in summarize', error)
+    }
+  }
+
+  /**
+   * @date 2022-08-23
+   * @param {JSON String} reduceContext - string JSON Array
+   * @returns {Parsed String} - Parsed Object
+   */
   function parseReducedRecords (reduceContext) {
     let reduceContextParse = []
     for (let j = 0; j < reduceContext.values.length; j++) {
@@ -328,23 +370,68 @@ define([
     return reduceContextParse
   }
 
-  function summarize (context) {
-    try {
-      context.output.iterator().each(function (key, value) {
-        log.debug('key', key)
-        log.debug('value', value)
-        value = JSON.parse(value)
-        for (const iterator of value) {
-          log.debug('iterator', iterator)
-          record.delete({
-            type: 'customerpayment',
-            id: iterator.payment_id
-          })
-        }
-        return true
-      })
-    } catch (error) {
-      log.error('error in summarize', error)
+  function getInvoiceSearchFields (searchResultInv, i) {
+    var tranid = searchResultInv[i].getValue({
+      name: 'tranid',
+      label: 'Document Number'
+    })
+    var customer = searchResultInv[i].getValue({
+      name: 'entity',
+      label: 'Name'
+    })
+    var internalid = searchResultInv[i].getValue({
+      name: 'internalid',
+      label: 'Internal ID'
+    })
+    var transactionname = searchResultInv[i].getValue({
+      name: 'transactionname',
+      label: 'Transaction Name'
+    })
+    var status = searchResultInv[i].getValue({
+      name: 'statusref',
+      label: 'Status'
+    })
+    return { tranid, customer, internalid, transactionname, status }
+  }
+
+  function getSpsSearchFields (searchResultSps, i) {
+    var invoiceNumber = searchResultSps[i].getValue({
+      name: 'custcol_sps_cx_invoicenumber',
+      label: 'SPS CX Invoice Number'
+    })
+    var originalAmt = searchResultSps[i].getValue({
+      name: 'custcol_sps_cx_originalamt',
+      label: 'SPS CX Amount (Pre-Discount)'
+    })
+    var discAmountTaken = searchResultSps[i].getValue({
+      name: 'custcol_sps_cx_disc_amounttaken',
+      label: 'SPS CX Remittance Discount'
+    })
+    var adjAmount = searchResultSps[i].getValue({
+      name: 'custcol_sps_cx_adjamount',
+      label: 'SPS CX Adjustment Amount'
+    })
+    var netPaidAmt = searchResultSps[i].getValue({
+      name: 'custcol_sps_cx_netpaidamt',
+      label: 'SPS CX Net Paid Amount'
+    })
+    var internalidSps = searchResultSps[i].getValue({
+      name: 'internalid',
+      label: 'Internal ID'
+    })
+
+    var lineId = searchResultSps[i].getValue({
+      name: 'line',
+      label: 'Line ID'
+    })
+    return {
+      invoiceNumber,
+      originalAmt,
+      discAmountTaken,
+      adjAmount,
+      netPaidAmt,
+      internalidSps,
+      lineId
     }
   }
 
@@ -391,6 +478,7 @@ define([
   return {
     getInputData: getInputData,
     map: map,
-    reduce: reduce
+    reduce: reduce,
+    summarize: summarize
   }
 })
