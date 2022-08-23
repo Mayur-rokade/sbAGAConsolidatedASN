@@ -62,35 +62,7 @@ define([
       let invoiceNumberArr = []
 
       for (let i = 0; i < searchResultSpsLength; i++) {
-        var invoiceNumber = searchResultSps[i].getValue({
-          name: 'custcol_sps_cx_invoicenumber',
-          label: 'SPS CX Invoice Number'
-        })
-        var originalAmt = searchResultSps[i].getValue({
-          name: 'custcol_sps_cx_originalamt',
-          label: 'SPS CX Amount (Pre-Discount)'
-        })
-        var discAmountTaken = searchResultSps[i].getValue({
-          name: 'custcol_sps_cx_disc_amounttaken',
-          label: 'SPS CX Remittance Discount'
-        })
-        var adjAmount = searchResultSps[i].getValue({
-          name: 'custcol_sps_cx_adjamount',
-          label: 'SPS CX Adjustment Amount'
-        })
-        var netPaidAmt = searchResultSps[i].getValue({
-          name: 'custcol_sps_cx_netpaidamt',
-          label: 'SPS CX Net Paid Amount'
-        })
-        var internalidSps = searchResultSps[i].getValue({
-          name: 'internalid',
-          label: 'Internal ID'
-        })
-
-        var lineId = searchResultSps[i].getValue({
-          name: 'line',
-          label: 'Line ID'
-        })
+        var { invoiceNumber, originalAmt, discAmountTaken, adjAmount, netPaidAmt, internalidSps, lineId } = getSpsSearchFields(searchResultSps, i)
 
         finalSearchResults.push({
           lineNo: i,
@@ -136,22 +108,7 @@ define([
         let invoiceResultLength = searchResultInv.length
 
         for (let i = 0; i < invoiceResultLength; i++) {
-          var tranid = searchResultInv[i].getValue({
-            name: 'tranid',
-            label: 'Document Number'
-          })
-          var customer = searchResultInv[i].getValue({
-            name: 'entity',
-            label: 'Name'
-          })
-          var internalid = searchResultInv[i].getValue({
-            name: 'internalid',
-            label: 'Internal ID'
-          })
-          var transactionname = searchResultInv[i].getValue({
-            name: 'transactionname',
-            label: 'Transaction Name'
-          })
+          var { tranid, customer, internalid, transactionname } = getInvoiceSearchFields(searchResultInv, i)
 
           var fileterRes = finalSearchResults.filter(
             x => x.invoiceNumber === tranid
@@ -175,6 +132,59 @@ define([
       log.error('Error in getinputdata', e.toString())
     }
   }
+
+   function getInvoiceSearchFields(searchResultInv, i) {
+     var tranid = searchResultInv[i].getValue({
+       name: 'tranid',
+       label: 'Document Number'
+     })
+     var customer = searchResultInv[i].getValue({
+       name: 'entity',
+       label: 'Name'
+     })
+     var internalid = searchResultInv[i].getValue({
+       name: 'internalid',
+       label: 'Internal ID'
+     })
+     var transactionname = searchResultInv[i].getValue({
+       name: 'transactionname',
+       label: 'Transaction Name'
+     })
+     return { tranid, customer, internalid, transactionname }
+   }
+
+   function getSpsSearchFields(searchResultSps, i) {
+     var invoiceNumber = searchResultSps[i].getValue({
+       name: 'custcol_sps_cx_invoicenumber',
+       label: 'SPS CX Invoice Number'
+     })
+     var originalAmt = searchResultSps[i].getValue({
+       name: 'custcol_sps_cx_originalamt',
+       label: 'SPS CX Amount (Pre-Discount)'
+     })
+     var discAmountTaken = searchResultSps[i].getValue({
+       name: 'custcol_sps_cx_disc_amounttaken',
+       label: 'SPS CX Remittance Discount'
+     })
+     var adjAmount = searchResultSps[i].getValue({
+       name: 'custcol_sps_cx_adjamount',
+       label: 'SPS CX Adjustment Amount'
+     })
+     var netPaidAmt = searchResultSps[i].getValue({
+       name: 'custcol_sps_cx_netpaidamt',
+       label: 'SPS CX Net Paid Amount'
+     })
+     var internalidSps = searchResultSps[i].getValue({
+       name: 'internalid',
+       label: 'Internal ID'
+     })
+
+     var lineId = searchResultSps[i].getValue({
+       name: 'line',
+       label: 'Line ID'
+     })
+     return { invoiceNumber, originalAmt, discAmountTaken, adjAmount, netPaidAmt, internalidSps, lineId }
+   }
 
   function map (mapContext) {
     try {
@@ -222,11 +232,33 @@ define([
             value: true
           })
 
-          var rid3 = objRecord3.save({
+          var payment_id = objRecord3.save({
             enableSourcing: true,
             ignoreMandatoryFields: true
           })
-          log.debug('rid3', rid3)
+          log.debug('payment_id', payment_id)
+
+          if (_logValidation(payment_id)) {
+            mapContext.write({
+              key: mapContextParse.internalidSps,
+              value: {
+                lineId: mapContextParse.lineId,
+                bool: true,
+                invoiceNumber: mapContextParse.invoiceNumber,
+                payment_id: payment_id
+              }
+            })
+          }
+        } else {
+            mapContext.write({
+              key: mapContextParse.internalidSps,
+              value: {
+                lineId: mapContextParse.lineId,
+                bool: false,
+                invoiceNumber: mapContextParse.invoiceNumber,
+                payment_id: payment_id
+              }
+            })
         }
       }
     } catch (e) {
@@ -255,20 +287,20 @@ define([
           value: spsInvDocNumVal
         })
 
-        let getCheckboxVal = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_gbs_ispaymentcreate',
-          line: lineNumber
-        })
+        // let getCheckboxVal = loadSpsRecord.getSublistValue({
+        //   sublistId: 'line',
+        //   fieldId: 'custcol_gbs_ispaymentcreate',
+        //   line: lineNumber
+        // })
 
-        if (getCheckboxVal == false) {
+        //if (getCheckboxVal == false) {
           loadSpsRecord.setSublistValue({
             sublistId: 'line',
             fieldId: 'custcol_gbs_ispaymentcreate',
-            value: true,
+            value: spsInvDocNum[i].bool,
             line: lineNumber
           })
-        }
+        //}
       }
 
       var spsRecId = loadSpsRecord.save({
