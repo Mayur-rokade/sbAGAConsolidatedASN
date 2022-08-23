@@ -17,6 +17,7 @@
   */
 }
 // END SCRIPT DESCRIPTION BLOCK ====================================
+
 define([
   'N/record',
   'N/runtime',
