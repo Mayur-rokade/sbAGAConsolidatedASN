@@ -363,9 +363,11 @@ define([
         accountId: accountID
       })
       resolvedDomain = 'https://' + '' + resolvedDomain
+      log.debug('context',context);
+      log.debug('context output',context.output);
       context.output.iterator().each(function (key, value) {
-        //log.debug('key', key)
-        //log.debug('value', value)
+        log.debug('key', key)
+        log.debug('value', value)
         value = JSON.parse(value)
         for (const iterator of value) {
           //log.debug('alreadyCreated', iterator.alreadyCreated)
@@ -376,7 +378,7 @@ define([
               recordType: 'customerpayment',
               recordId: iterator.payment_id,
               isEditMode: false
-            })
+            }) 
             body += `Payment record created with Internal ID ${
               iterator.payment_id
             } for SPS Record ${key} with Document Number ${
