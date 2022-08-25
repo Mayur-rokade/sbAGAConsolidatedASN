@@ -76,6 +76,7 @@ define([
       var searchResultSps = searchAll(transactionSearchObj.run())
 
       var searchResultSpsLength = searchResultSps.length
+      log.debug('searchresultlenght',searchResultSpsLength)
 
       let invoiceNumberArr = []
 
@@ -163,6 +164,7 @@ define([
         }
       }
 
+      log.debug('finalsearchresult',finalSearchResults)
       return finalSearchResults
     } catch (e) {
       log.error('Error in getinputdata', e.toString())
