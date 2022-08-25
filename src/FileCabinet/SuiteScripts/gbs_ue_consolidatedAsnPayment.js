@@ -40,8 +40,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
       try {
 
-        var loadSpsRecord = scriptContext.newRecord;
-        var internalidSps = loadSpsRecord.id;
+        var loadSpsRecordContext = scriptContext.newRecord;
+        var internalidSps = loadSpsRecordContext.id;
      
         var finalSearchResults = []
         var invoiceNumberArr = []
@@ -281,7 +281,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
     }
 
 
-    //set isPaymentCreated checkbox value to true on the basis of present invoice number in checkboxValueArr
+    /**
+     * function use to set isPaymentCreated checkbox value to true on the basis of present invoice number in checkboxValueArr
+     * @param {Record} loadSpsRecord - load sps payment order record 
+     * @param {Array} checkboxValueArr - array of object contain payment and sps record data
+     * @since 2015.2
+     */
     function setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr) {
 
     try{
@@ -322,8 +327,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
     }
     }
 
-    //send status email of payemnt record created and already created record
-    //todo
+    
+     /**
+     * function is use to send status email of payemnt record created and already created record
+     * @param {Array} checkboxValueArr - array of object contain payment and sps record data
+     * @since 2015.2
+     */
     function sendPaymentRecordMail(checkboxValueArr) {
       try{
       let body = `Dear User, 
@@ -385,7 +394,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       }
     }
 
-    //function is use for get all data from finalSearchResults array of object
+
+    /**
+     * function is use for get all data from finalSearchResults array of object
+     * @param {Array} finalSearchResults - array of object contain final data of invoice, payment and sps record data
+     * @param {number} i - position of element in array
+     * @since 2015.2
+     */
     function getInvoiceSpsValue(finalSearchResults, i) {
       try{
       let invoiceId = finalSearchResults[i].internalid;
@@ -407,7 +422,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       }
     }
 
-    //search on invoice record
+    
+      /**
+     * function work for get all data from invoice record using search
+     * @param {Array} invoiceNumberArr - contains invoice number to search on invoice record
+     * @since 2015.2
+     */
     function invoiceSearch(invoiceNumberArr) {
 
       try{
@@ -444,7 +464,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
     }
 
   
-    //get line level data from sps payment order record 
+    
+      /**
+     * function is use to get line level data from sps payment order record 
+     * @param {Record} loadSpsRecord - load sps payment order record 
+     * @param {number} i - position of element in array
+     * @since 2015.2
+     */
     function getSpsLineData(loadSpsRecord,i) {
       try{
 
@@ -486,7 +512,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       }
     }
 
-    //get invoice search values from searchResultInv search
+    
+         /**
+     * function is use to get invoice search values from searchResultInv search
+     * @param {Array} searchResultInv - get all invoice search result data
+     * @param {number} i - position of element in array
+     * @since 2015.2
+     */
     function getInvoiceSearchFields(searchResultInv, i) {
       try{
       let tranid = searchResultInv[i].getValue({
@@ -519,6 +551,11 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       }
     }
 
+    /**
+     * function is use to search all records with range
+     * @param {Array} resultset - pass search 
+     * @since 2015.2
+     */
     function searchAll(resultset) {
       var allResults = []
       var startIndex = 0
@@ -543,7 +580,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       return allResults
     }
 
-    //log validation to check value is null or undefined if true then execute next process else false
+    
+    /**
+     * log validation to check value is null or undefined if true then execute next process else false
+     * @param {number} value - pass variable name
+     * @since 2015.2
+     */
     function _logValidation(value) {
       if (
         value != null &&
