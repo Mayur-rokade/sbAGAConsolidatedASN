@@ -1,4 +1,14 @@
 <manifest projecttype="ACCOUNTCUSTOMIZATION">
   <projectname>sandboxVS</projectname>
   <frameworkversion>1.0</frameworkversion>
+  <dependencies>
+    <features>
+      <feature required="true">SERVERSIDESCRIPTING</feature>
+      <feature required="false">CRM</feature>
+      <feature required="false">CREATESUITEBUNDLES</feature>
+    </features>
+    <objects>
+      <object>customtransaction_sps_cx_820_basic</object>
+    </objects>
+  </dependencies>
 </manifest>

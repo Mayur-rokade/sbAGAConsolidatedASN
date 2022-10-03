@@ -38,11 +38,11 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
      */
     function afterSubmit(scriptContext) {
 
+
       try {
 
         var loadSpsRecordContext = scriptContext.newRecord;
         var internalidSps = loadSpsRecordContext.id;
-     
         var finalSearchResults = []
         var invoiceNumberArr = []
 
@@ -66,12 +66,17 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             invoiceNumber,
             netPaidAmt,
             lineId,
-            paymentCreateCheckbox
+            paymentCreateCheckbox,
+            adjustAmt,
+            microfilm,
+            referenceNum,
+            datesps
           } = getSpsLineData(loadSpsRecord,i)
 
+          // log.debug('payment create checkbox',paymentCreateCheckbox);
 
           //validation to check isCreatedPayment checkbox value is false and invoice number and net paid amount is not blank
-          if(paymentCreateCheckbox == false && _logValidation(invoiceNumber) && _logValidation(netPaidAmt)){
+          if(paymentCreateCheckbox == false && _logValidation(invoiceNumber) && (_logValidation(netPaidAmt) || _logValidation(adjustAmt))){
 
           //push all line level data of invoice number and net paid ammount in finalSearchResults array
           finalSearchResults.push({
@@ -79,9 +84,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             invoiceNumber: invoiceNumber,
             netPaidAmt: netPaidAmt,
             lineId: lineId,
-            internalidSps: internalidSps
+            internalidSps: internalidSps,
+            adjustAmt:adjustAmt,
+            microfilm:microfilm,
+            referenceNum:referenceNum,
+            datesps:datesps
           })
-        
+        // log.debug('finalsearchresult',finalSearchResults)
             //push criteria of invoice number into invoiceNumberArr 
             invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
         }
@@ -153,8 +162,23 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         for (let i = 0; i < finalSearchResultsLength; i++) {
 
           //get all invoice record and sps record data values from getInvoiceSpsValue() function
-          let { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount } = getInvoiceSpsValue(finalSearchResults, i);
+          let { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps } = getInvoiceSpsValue(finalSearchResults, i);
           // log.debug('invoice id',invoiceId)
+
+          if(_logValidation(customerInv)){
+          let lookupOnCustomer = search.lookupFields({
+            type: 'customer',
+            id: customerInv,
+            columns: ['custentity_auto_apply_remittance_payment']
+          });
+
+          var autoApplyRemit = lookupOnCustomer.custentity_auto_apply_remittance_payment;
+
+          // log.debug('autoApplyRemit',autoApplyRemit)
+
+       
+
+          if(autoApplyRemit === true){
 
           //if status is paidInFull then push alreadyCreated property into object to true and also push necessary data
           if (status === 'paidInFull') {
@@ -172,7 +196,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             _logValidation(invoiceId) &&
             _logValidation(customerInv) &&
             _logValidation(spsPaidAmount) &&
-            _logValidation(invoiceNumber)
+            _logValidation(invoiceNumber) &&
+            spsPaidAmount > 0
           ) {
 
             //transform invoice record to cutomer payment record using invoice id
@@ -193,7 +218,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             // log.debug(`Line found for ${invoiceId} on payment transform`, lineNo)
 
             //if line no is not equal to -1 then set sps paid amount on payment field and apply particular invoice from payment line level
-            if (lineNo != -1) {
+            if (lineNo != -1 ) {
+
               invoiceToPayment.setValue({
                 fieldId: 'payment',
                 value: spsPaidAmount
@@ -218,7 +244,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                 enableSourcing: true,
                 ignoreMandatoryFields: true
               })
-              //log.debug('payment_id', payment_id)
+              // log.debug('payment_id', payment_id)
 
               if (_logValidation(payment_id)) {
                 log.audit(
@@ -238,6 +264,91 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               }
             }
           }
+          else if(
+          _logValidation(spsadjustAmt) &&
+          _logValidation(invoiceNumber) &&
+          spsadjustAmt < 0){
+
+            let createCheck = record.create({
+              type: 'check',
+            });
+
+            createCheck.setValue({
+              fieldId:'entity',
+              value:119
+            });
+
+            if(_logValidation(spsdatesps)){
+            createCheck.setValue({
+              fieldId:'trandate',
+              value:spsdatesps
+            });
+          }
+
+            if(_logValidation(spsreferenceNum)){
+            createCheck.setValue({
+              fieldId:'memo',
+              value:spsreferenceNum
+            });
+          }
+
+       
+            createCheck.setValue({
+              fieldId:'account',
+              value:551
+            });
+          
+
+       
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'account',
+              value:322,
+              line:0
+            });
+      
+
+             if(_logValidation(spsmicrofilm)){
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'memo',
+              value:spsmicrofilm,
+              line:0
+            });
+          }
+
+         
+            spsadjustAmt = Math.abs(spsadjustAmt);
+
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'amount',
+              value:spsadjustAmt,
+              line:0
+            });
+          
+
+            let payment_id = createCheck.save({
+              enableSourcing: true,
+              ignoreMandatoryFields: true
+            });
+
+            if (_logValidation(payment_id)) {
+
+            log.audit(`Created Check Record from Invoice Number ${invoiceNumber}`,`Check Id ${payment_id}`);
+
+            checkboxValueArr.push({
+              key: internalidSps,
+              lineId: lineId,
+              bool: true,
+              invoiceNumber: invoiceNumber,
+              payment_id: payment_id
+
+            });
+          }
+
+          }
+      
           else {
             log.audit(
               `No valid payment record found for SPS Record --> ${internalidSps}`,
@@ -254,19 +365,23 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
             })
           }
-
         }
-
+      }
+      }
+   
         // log.debug('checkboxarr', checkboxValueArr);
 
-        //set isPaymentCreated checkbox value is true in setCheckboxValueOnSps() function
         setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr);
+
+        //set isPaymentCreated checkbox value is true in setCheckboxValueOnSps() function
+        // setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr);
 
         log.debug('SPS Record with Internal ID updated --->', internalidSps)
 
         //send mail to receiptant for # of payment record created and already created.
         sendPaymentRecordMail(checkboxValueArr);
-        
+
+    
       }
     }
       catch (e) {
@@ -408,6 +523,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       let customerInv = finalSearchResults[i].customerId;
 
       let spsPaidAmount = finalSearchResults[i].netPaidAmt;
+      // log.debug('spsPaidAmount',spsPaidAmount)
 
       let invoiceNumber = finalSearchResults[i].invoiceNumber;
 
@@ -415,7 +531,15 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
       let lineId = finalSearchResults[i].lineId;
 
-      return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount };
+      let spsadjustAmt = finalSearchResults[i].adjustAmt;
+
+      let spsmicrofilm = finalSearchResults[i].microfilm;
+
+      let spsreferenceNum = finalSearchResults[i].referenceNum;
+
+      let spsdatesps = finalSearchResults[i].datesps;
+
+      return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps };
       }
       catch(e){
         log.error('error in getInvoiceSpsValue',e.toString())
@@ -486,6 +610,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         line:i
       });
 
+
       let lineId = loadSpsRecord.getSublistValue({
         sublistId: 'line',
         fieldId: 'line',
@@ -498,13 +623,42 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         line:i
       });
 
+      let adjustAmt = loadSpsRecord.getSublistValue({
+        sublistId:'line',
+        fieldId: 'custcol_sps_cx_adjamount',
+        line:i
+      });
+
+      let microfilm = loadSpsRecord.getSublistValue({
+        sublistId:'line',
+        fieldId: 'custcol_sps_cx_microfilmnum',
+        line:i
+      });
+
+      let referenceNum = loadSpsRecord.getValue({
+        sublistId:'line',
+        fieldId: 'custbody_sps_cx_refnum',
+        line:i
+      });
+
+      let datesps = loadSpsRecord.getValue({
+        sublistId:'line',
+        fieldId: 'trandate',
+        line:i
+      });
+
+
       // log.debug('invoicenumber + netPaidAmt + lineId + paymentCreateCheckbox',invoiceNumber + netPaidAmt + lineId + paymentCreateCheckbox)
 
       return {
         invoiceNumber,
         netPaidAmt,
         lineId,
-        paymentCreateCheckbox
+        paymentCreateCheckbox,
+        adjustAmt,
+        microfilm,
+        referenceNum,
+        datesps
       }
     }
       catch(e){

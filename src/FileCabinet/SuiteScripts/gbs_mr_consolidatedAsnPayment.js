@@ -147,20 +147,7 @@ define([
           } = getInvoiceSearchFields(searchResultInv, i)
           //log.debug('status', status)
 
-          var fileterRes = finalSearchResults.filter(
-            x => x.invoiceNumber === tranid
-          )
-
-          for (const iterator of fileterRes) {
-            let obj = finalSearchResults[iterator.lineNo]
-
-            obj.invoiceId = tranid
-            obj.customerId = customer
-            obj.internalid = internalid
-            obj.transactionname = transactionname
-            obj.status = status
-            finalSearchResults[iterator.lineNo] = obj
-          }
+        
         }
       }
 
