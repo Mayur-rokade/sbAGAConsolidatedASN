@@ -231,21 +231,56 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                   //if line no is not equal to -1 then set sps paid amount on payment field and apply particular invoice from payment line level
                   if (lineNo != -1) {
 
-                    var paymentObject = {
-                      invoiceToPayment: invoiceToPayment, 
-                      spsPaidAmount:    spsPaidAmount, 
-                      internalidSps:    internalidSps,
-                       lineNo:           lineNo, 
-                       invoiceNumber:    invoiceNumber, 
-                       checkboxValueArr: checkboxValueArr,
-                      lineId:           lineId
-                    }
+                    invoiceToPayment.setValue({
+                      fieldId: 'payment',
+                      value: spsPaidAmount
+                    })
 
-                    //function is use for apply invoice and amount on customer payment record.
-                    var payment_id = applyInvoiceOnPayment(paymentObject);
+                    invoiceToPayment.setValue({
+                      fieldId: 'custbody_gbs_payment_order',
+                      value: internalidSps
+                    });
+
+                    invoiceToPayment.setSublistValue({
+                      sublistId: 'apply',
+                      fieldId: 'apply',
+                      line: lineNo,
+                      value: true
+                    })
+
+                    invoiceToPayment.setSublistValue({
+                      sublistId: 'apply',
+                      fieldId: 'amount',
+                      line: lineNo,
+                      value: spsPaidAmount
+                    })
+
+                    //save customer payment record
+                    var payment_id = invoiceToPayment.save({
+                      enableSourcing: true,
+                      ignoreMandatoryFields: true
+                    })
+                    // log.debug('payment_id', payment_id)
+
+                    if (_logValidation(payment_id)) {
+                      log.audit(
+                        `Payment record created for SPS Record --> ${internalidSps}`,
+                        `Invoice Number ${invoiceNumber} --> Payment Record ${payment_id}`
+                      )
+
+                      //push created payment record id into checkboxValueArr and other necessary data 
+                      checkboxValueArr.push({
+                        key: internalidSps,
+                        lineId: lineId,
+                        bool: true,
+                        invoiceNumber: invoiceNumber,
+                        payment_id: payment_id
+
+                      })
+                    }
                   }
                 }
-                //else if sps adjustment amount is negative then script will set amount on each line for each invoice.
+                //else if 
                 else if (
                   _logValidation(spsadjustAmt) &&
                   _logValidation(invoiceNumber) &&
@@ -255,25 +290,82 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
                   totalTranAmt += spsadjustAmt;
 
-                  var checkApplyObj = {
 
-                    createCheck:      createCheck, 
-                    internalidSps:    internalidSps, 
-                    spsdatesps:       spsdatesps, 
-                    spsreferenceNum:  spsreferenceNum, 
-                    spsmicrofilm:     spsmicrofilm, 
-                    spsadjustAmt:     spsadjustAmt, 
-                    checkboxValueArr: checkboxValueArr, 
-                    lineId:           lineId, 
-                    invoiceNumber:    invoiceNumber
+                  createCheck.setValue({
+                    fieldId: 'entity',
+                    value: 119
+                  });
 
+                  createCheck.setValue({
+                    fieldId: 'custbody_gbs_payment_order',
+                    value: internalidSps
+                  });
+
+                  if (_logValidation(spsdatesps)) {
+                    createCheck.setValue({
+                      fieldId: 'trandate',
+                      value: spsdatesps
+                    });
                   }
-             
-                  //function is use for set account and amount on expense subtab line level
-                  spsadjustAmt = applyCheckFromAdjstAmt(checkApplyObj);
+
+                  if (_logValidation(spsreferenceNum)) {
+                    createCheck.setValue({
+                      fieldId: 'memo',
+                      value: spsreferenceNum
+                    });
+                  }
+
+
+                  createCheck.setValue({
+                    fieldId: 'account',
+                    value: 551
+                  });
+
+
+                  createCheck.selectNewLine({
+                    sublistId: 'expense'
+                  });
+
+                  createCheck.setCurrentSublistValue({
+                    sublistId: 'expense',
+                    fieldId: 'account',
+                    value: 322,
+                    ignoreFieldChange: true
+                  });
+
+                  if (_logValidation(spsmicrofilm)) {
+                    createCheck.setCurrentSublistValue({
+                      sublistId: 'expense',
+                      fieldId: 'memo',
+                      value: spsmicrofilm,
+
+                    });
+                  }
+
+                  //convert value from negative to positive 
+                  spsadjustAmt = Math.abs(spsadjustAmt);
+
+                  createCheck.setCurrentSublistValue({
+                    sublistId: 'expense',
+                    fieldId: 'amount',
+                    value: spsadjustAmt,
+                  });
+
+                  createCheck.commitLine({
+                    sublistId: 'expense'
+                  });
+
+                  checkboxValueArr.push({
+                    key: internalidSps,
+                    lineId: lineId,
+                    bool: true,
+                    invoiceNumber: invoiceNumber,
+                    payment_id: 1
+
+                  });
 
                 }
-                //else no valid payment record found on sps record 
+
                 else {
                   log.audit(
                     `No valid payment record found for SPS Record --> ${internalidSps}`,
@@ -293,7 +385,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               }
             }
 
-            //if i is equal to search result length and temp value is greater than 0 then save check record. If no expense is set on check record then it won't be save.
             if ((i == finalSearchResultsLength - 1) && temp > 0) {
               var payment_id = createCheck.save({
                 enableSourcing: true,
@@ -341,155 +432,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
     }
 
-   /**
-     * function is use for set account and amount on expense subtab line level
-     * @param {object} checkApplyObj - contains parameters to set value on line item
-     * @since 2015.2
-     */
-    function applyCheckFromAdjstAmt(checkApplyObj) {
-
-      var  {createCheck, internalidSps, spsdatesps, spsreferenceNum, spsmicrofilm, spsadjustAmt, checkboxValueArr, lineId, invoiceNumber} = checkApplyObj;
-
-      //set 10 Home Depot payee on entity field
-      createCheck.setValue({
-        fieldId: 'entity',
-        value: 119
-      });
-
-      //set 820 payment record on payment order field.
-      createCheck.setValue({
-        fieldId: 'custbody_gbs_payment_order',
-        value: internalidSps
-      });
-
-      if (_logValidation(spsdatesps)) {
-        createCheck.setValue({
-          fieldId: 'trandate',
-          value: spsdatesps
-        });
-      }
-
-      if (_logValidation(spsreferenceNum)) {
-        createCheck.setValue({
-          fieldId: 'memo',
-          value: spsreferenceNum
-        });
-      }
-
-      //set Home Depot Clearing account on accont field (body level) 
-      createCheck.setValue({
-        fieldId: 'account',
-        value: 551
-      });
-
-
-      createCheck.selectNewLine({
-        sublistId: 'expense'
-      });
-
-      //set Home Depot Chargebacks account on line level account field.
-      createCheck.setCurrentSublistValue({
-        sublistId: 'expense',
-        fieldId: 'account',
-        value: 322,
-        ignoreFieldChange: true
-      });
-
-      if (_logValidation(spsmicrofilm)) {
-        createCheck.setCurrentSublistValue({
-          sublistId: 'expense',
-          fieldId: 'memo',
-          value: spsmicrofilm,
-        });
-      }
-
-      //convert value from negative to positive 
-      spsadjustAmt = Math.abs(spsadjustAmt);
-
-      createCheck.setCurrentSublistValue({
-        sublistId: 'expense',
-        fieldId: 'amount',
-        value: spsadjustAmt,
-      });
-
-      createCheck.commitLine({
-        sublistId: 'expense'
-      });
-
-      checkboxValueArr.push({
-        key: internalidSps,
-        lineId: lineId,
-        bool: true,
-        invoiceNumber: invoiceNumber,
-        payment_id: 1
-      });
-      return spsadjustAmt;
-    }
-
-      /**
-     * function is use for apply invoice and amount on customer payment record.
-     * @param {object} paymentObject - contains parameters to set value on line item
-     * @since 2015.2
-     */
-    function applyInvoiceOnPayment(paymentObject) {
-
-      var{
-        invoiceToPayment, 
-        spsPaidAmount ,
-        internalidSps,
-         lineNo ,
-         invoiceNumber ,
-         checkboxValueArr,
-        lineId,
-      } = paymentObject;
-
-      invoiceToPayment.setValue({
-        fieldId: 'payment',
-        value: spsPaidAmount
-      });
-
-      invoiceToPayment.setValue({
-        fieldId: 'custbody_gbs_payment_order',
-        value: internalidSps
-      });
-
-      invoiceToPayment.setSublistValue({
-        sublistId: 'apply',
-        fieldId: 'apply',
-        line: lineNo,
-        value: true
-      });
-
-      invoiceToPayment.setSublistValue({
-        sublistId: 'apply',
-        fieldId: 'amount',
-        line: lineNo,
-        value: spsPaidAmount
-      });
-
-      //save customer payment record
-      var payment_id = invoiceToPayment.save({
-        enableSourcing: true,
-        ignoreMandatoryFields: true
-      });
-      // log.debug('payment_id', payment_id)
-      if (_logValidation(payment_id)) {
-        log.audit(
-          `Payment record created for SPS Record --> ${internalidSps}`,
-          `Invoice Number ${invoiceNumber} --> Payment Record ${payment_id}`
-        );
-
-        //push created payment record id into checkboxValueArr and other necessary data 
-        checkboxValueArr.push({
-          key: internalidSps,
-          lineId: lineId,
-          bool: true,
-          invoiceNumber: invoiceNumber,
-          payment_id: payment_id
-        });
-      }
-      return payment_id;
-    }
 
     /**
      * function is use for crate single journal entry record from sum of adjustment amount and sps net paid amount
