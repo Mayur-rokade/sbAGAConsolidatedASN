@@ -57,7 +57,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           sublistId: 'line'
         });
 
-
+        
         //iterate on length of sps line count
         for (let i = 0; i < getLineCountSps; i++) {
 
@@ -71,33 +71,33 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             microfilm,
             referenceNum,
             datesps
-          } = getSpsLineData(loadSpsRecord, i)
+          } = getSpsLineData(loadSpsRecord,i)
 
           // log.debug('payment create checkbox',paymentCreateCheckbox);
 
           //validation to check isCreatedPayment checkbox value is false and invoice number and net paid amount is not blank
-          if (paymentCreateCheckbox == false && _logValidation(invoiceNumber) && (_logValidation(netPaidAmt) || _logValidation(adjustAmt))) {
+          if(paymentCreateCheckbox == false && _logValidation(invoiceNumber) && (_logValidation(netPaidAmt) || _logValidation(adjustAmt))){
 
-            //push all line level data of invoice number and net paid ammount in finalSearchResults array
-            finalSearchResults.push({
-              lineNo: i,
-              invoiceNumber: invoiceNumber,
-              netPaidAmt: netPaidAmt,
-              lineId: lineId,
-              internalidSps: internalidSps,
-              adjustAmt: adjustAmt,
-              microfilm: microfilm,
-              referenceNum: referenceNum,
-              datesps: datesps
-            })
-            // log.debug('finalsearchresult',finalSearchResults)
+          //push all line level data of invoice number and net paid ammount in finalSearchResults array
+          finalSearchResults.push({
+            lineNo: i,
+            invoiceNumber: invoiceNumber,
+            netPaidAmt: netPaidAmt,
+            lineId: lineId,
+            internalidSps: internalidSps,
+            adjustAmt:adjustAmt,
+            microfilm:microfilm,
+            referenceNum:referenceNum,
+            datesps:datesps
+          })
+        // log.debug('finalsearchresult',finalSearchResults)
             //push criteria of invoice number into invoiceNumberArr 
             invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
-          }
         }
-        invoiceNumberArr.pop();
+      }
+      invoiceNumberArr.pop();
 
-        // log.debug('finalsearchresult',finalSearchResults)
+      // log.debug('finalsearchresult',finalSearchResults)
         // log.debug('invocienumberarr',invoiceNumberArr)
 
         //check invoicenumberarr is not blank
@@ -122,7 +122,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               status
             } = getInvoiceSearchFields(searchResultInv, i)
             //log.debug('status', status)
-            // log.debug('tranid',tranid)
+          // log.debug('tranid',tranid)
             // log.debug('tranid',tranid)
 
             //find duplicate results of sps line level data using doucement number and invoice number 
@@ -131,12 +131,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             )
 
             // log.debug('filterres',fileterRes);
-
+          
             //loop on filterRes to merge invoice record data
             for (const iterator of fileterRes) {
 
               let iteratorVal = iterator.lineNo;
-
+              
               //get index position of object from finalSearchResults array of object
               let index = finalSearchResults.map(object => object.lineNo).indexOf(iteratorVal);
               // log.debug('index',index)
@@ -153,272 +153,237 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
         // log.debug('finalSearchResults', finalSearchResults)
 
-        if (_logValidation(finalSearchResults)) {
+        if(_logValidation(finalSearchResults)){
+          
+        let finalSearchResultsLength = finalSearchResults.length;
 
-          let finalSearchResultsLength = finalSearchResults.length;
+        var checkboxValueArr = [];
 
-          var checkboxValueArr = [];
-          var totalTranAmt = 0;
-          var temp = 0;
+        for (let i = 0; i < finalSearchResultsLength; i++) {
 
-          //create check record from adjustment amount
-          var createCheck = record.create({
-            type: 'check',
-            isDynamic: true
+          //get all invoice record and sps record data values from getInvoiceSpsValue() function
+          let { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps } = getInvoiceSpsValue(finalSearchResults, i);
+          // log.debug('invoice id',invoiceId)
+
+          if(_logValidation(customerInv)){
+          let lookupOnCustomer = search.lookupFields({
+            type: 'customer',
+            id: customerInv,
+            columns: ['custentity_auto_apply_remittance_payment']
           });
 
-          for (let i = 0; i < finalSearchResultsLength; i++) {
+          var autoApplyRemit = lookupOnCustomer.custentity_auto_apply_remittance_payment;
 
-            //get all invoice record and sps record data values from getInvoiceSpsValue() function
-            var { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps } = getInvoiceSpsValue(finalSearchResults, i);
-            // log.debug('invoice id',invoiceId)
+          // log.debug('autoApplyRemit',autoApplyRemit)
 
-            //get remittance checkbox value from customer record
-            if (_logValidation(customerInv)) {
-              let lookupOnCustomer = search.lookupFields({
-                type: 'customer',
-                id: customerInv,
-                columns: ['custentity_auto_apply_remittance_payment']
-              });
+       
 
-              var autoApplyRemit = lookupOnCustomer.custentity_auto_apply_remittance_payment;
+          if(autoApplyRemit === true){
 
-              // log.debug('autoApplyRemit',autoApplyRemit)
+          //if status is paidInFull then push alreadyCreated property into object to true and also push necessary data
+          if (status === 'paidInFull') {
 
-              //if remittance checkbox is true then create payment, check and journal entry record.
-              if (autoApplyRemit === true) {
+            checkboxValueArr.push({
+              key: internalidSps,
+              lineId: lineId,
+              bool: true,
+              invoiceNumber: invoiceNumber,
+              alreadyCreated: true
+            })
+          }
+          //else if invoice id, customer, sps paid amount and invoice number is defined then transform invoice to customer payment record.
+          else if (
+            _logValidation(invoiceId) &&
+            _logValidation(customerInv) &&
+            _logValidation(spsPaidAmount) &&
+            _logValidation(invoiceNumber) &&
+            spsPaidAmount > 0
+          ) {
 
-                //if status is paidInFull then push alreadyCreated property into object to true and also push necessary data
-                if (status === 'paidInFull') {
+            //transform invoice record to cutomer payment record using invoice id
+            let invoiceToPayment = record.transform({
+              fromType: record.Type.INVOICE,
+              fromId: invoiceId,
+              toType: record.Type.CUSTOMER_PAYMENT,
+              isDynamic: false
+            })
 
-                  checkboxValueArr.push({
-                    key: internalidSps,
-                    lineId: lineId,
-                    bool: true,
-                    invoiceNumber: invoiceNumber,
-                    alreadyCreated: true
-                  })
-                }
-                //else if invoice id, customer, sps paid amount and invoice number is defined then transform invoice to customer payment record.
-                else if (
-                  _logValidation(invoiceId) &&
-                  _logValidation(customerInv) &&
-                  _logValidation(spsPaidAmount) &&
-                  _logValidation(invoiceNumber) &&
-                  spsPaidAmount > 0
-                ) {
+            //find invoice number from apply line level data
+            let lineNo = invoiceToPayment.findSublistLineWithValue({
+              sublistId: 'apply',
+              fieldId: 'refnum',
+              value: invoiceNumber
+            })
 
-                  totalTranAmt += spsPaidAmount;
+            // log.debug(`Line found for ${invoiceId} on payment transform`, lineNo)
 
-                  //transform invoice record to cutomer payment record using invoice id
-                  let invoiceToPayment = record.transform({
-                    fromType: record.Type.INVOICE,
-                    fromId: invoiceId,
-                    toType: record.Type.CUSTOMER_PAYMENT,
-                    isDynamic: false
-                  })
+            //if line no is not equal to -1 then set sps paid amount on payment field and apply particular invoice from payment line level
+            if (lineNo != -1 ) {
 
-                  //find invoice number from apply line level data
-                  let lineNo = invoiceToPayment.findSublistLineWithValue({
-                    sublistId: 'apply',
-                    fieldId: 'refnum',
-                    value: invoiceNumber
-                  })
+              invoiceToPayment.setValue({
+                fieldId: 'payment',
+                value: spsPaidAmount
+              })
 
-                  // log.debug(`Line found for ${invoiceId} on payment transform`, lineNo)
+              invoiceToPayment.setSublistValue({
+                sublistId: 'apply',
+                fieldId: 'apply',
+                line: lineNo,
+                value: true
+              })
 
-                  //if line no is not equal to -1 then set sps paid amount on payment field and apply particular invoice from payment line level
-                  if (lineNo != -1) {
+              invoiceToPayment.setSublistValue({
+                sublistId: 'apply',
+                fieldId: 'amount',
+                line: lineNo,
+                value: spsPaidAmount
+              })
 
-                    invoiceToPayment.setValue({
-                      fieldId: 'payment',
-                      value: spsPaidAmount
-                    })
-
-                    invoiceToPayment.setValue({
-                      fieldId: 'custbody_gbs_payment_order',
-                      value: internalidSps
-                    });
-
-                    invoiceToPayment.setSublistValue({
-                      sublistId: 'apply',
-                      fieldId: 'apply',
-                      line: lineNo,
-                      value: true
-                    })
-
-                    invoiceToPayment.setSublistValue({
-                      sublistId: 'apply',
-                      fieldId: 'amount',
-                      line: lineNo,
-                      value: spsPaidAmount
-                    })
-
-                    //save customer payment record
-                    var payment_id = invoiceToPayment.save({
-                      enableSourcing: true,
-                      ignoreMandatoryFields: true
-                    })
-                    // log.debug('payment_id', payment_id)
-
-                    if (_logValidation(payment_id)) {
-                      log.audit(
-                        `Payment record created for SPS Record --> ${internalidSps}`,
-                        `Invoice Number ${invoiceNumber} --> Payment Record ${payment_id}`
-                      )
-
-                      //push created payment record id into checkboxValueArr and other necessary data 
-                      checkboxValueArr.push({
-                        key: internalidSps,
-                        lineId: lineId,
-                        bool: true,
-                        invoiceNumber: invoiceNumber,
-                        payment_id: payment_id
-
-                      })
-                    }
-                  }
-                }
-                else if (
-                  _logValidation(spsadjustAmt) &&
-                  _logValidation(invoiceNumber) &&
-                  spsadjustAmt < 0) {
-
-                  temp++;
-
-                  totalTranAmt += spsadjustAmt;
-
-
-                  createCheck.setValue({
-                    fieldId: 'entity',
-                    value: 119
-                  });
-
-                  createCheck.setValue({
-                    fieldId: 'custbody_gbs_payment_order',
-                    value: internalidSps
-                  });
-
-                  if (_logValidation(spsdatesps)) {
-                    createCheck.setValue({
-                      fieldId: 'trandate',
-                      value: spsdatesps
-                    });
-                  }
-
-                  if (_logValidation(spsreferenceNum)) {
-                    createCheck.setValue({
-                      fieldId: 'memo',
-                      value: spsreferenceNum
-                    });
-                  }
-
-
-                  createCheck.setValue({
-                    fieldId: 'account',
-                    value: 551
-                  });
-
-
-                  createCheck.selectNewLine({
-                    sublistId: 'expense'
-                  });
-
-                  createCheck.setCurrentSublistValue({
-                    sublistId: 'expense',
-                    fieldId: 'account',
-                    value: 322,
-                    ignoreFieldChange: true
-                  });
-
-                  if (_logValidation(spsmicrofilm)) {
-                    createCheck.setCurrentSublistValue({
-                      sublistId: 'expense',
-                      fieldId: 'memo',
-                      value: spsmicrofilm,
-
-                    });
-                  }
-
-                  //convert value from negative to positive 
-                  spsadjustAmt = Math.abs(spsadjustAmt);
-
-                  createCheck.setCurrentSublistValue({
-                    sublistId: 'expense',
-                    fieldId: 'amount',
-                    value: spsadjustAmt,
-                  });
-
-                  createCheck.commitLine({
-                    sublistId: 'expense'
-                  });
-
-                  checkboxValueArr.push({
-                    key: internalidSps,
-                    lineId: lineId,
-                    bool: true,
-                    invoiceNumber: invoiceNumber,
-                    payment_id: 1
-
-                  });
-
-                }
-
-                else {
-                  log.audit(
-                    `No valid payment record found for SPS Record --> ${internalidSps}`,
-                    `Invoice Number ${invoiceNumber}`
-                  )
-
-                  //else invoice record not found then push invoice number and line id
-                  checkboxValueArr.push({
-                    key: internalidSps,
-                    lineId: lineId,
-                    bool: true,
-                    invoiceNumber: invoiceNumber,
-                    payment_id: payment_id
-
-                  })
-                }
-              }
-            }
-
-            if ((i == finalSearchResultsLength - 1) && temp > 0) {
-              var payment_id = createCheck.save({
+              //save customer payment record
+              var payment_id = invoiceToPayment.save({
                 enableSourcing: true,
                 ignoreMandatoryFields: true
-              });
+              })
+              // log.debug('payment_id', payment_id)
 
-              log.audit(`Created Check Record from Invoice Number ${invoiceNumber}`, `Check Id ${payment_id}`);
+              if (_logValidation(payment_id)) {
+                log.audit(
+                  `Payment record created for SPS Record --> ${internalidSps}`,
+                  `Invoice Number ${invoiceNumber} --> Payment Record ${payment_id}`
+                )
 
+                //push created payment record id into checkboxValueArr and other necessary data 
+                checkboxValueArr.push({
+                  key: internalidSps,
+                  lineId: lineId,
+                  bool: true,
+                  invoiceNumber: invoiceNumber,
+                  payment_id: payment_id
+
+                })
+              }
             }
+          }
+          else if(
+          _logValidation(spsadjustAmt) &&
+          _logValidation(invoiceNumber) &&
+          spsadjustAmt < 0){
 
+            let createCheck = record.create({
+              type: 'check',
+            });
+
+            createCheck.setValue({
+              fieldId:'entity',
+              value:119
+            });
+
+            if(_logValidation(spsdatesps)){
+            createCheck.setValue({
+              fieldId:'trandate',
+              value:spsdatesps
+            });
           }
 
-          var JeObject = {
-            totalTranAmt :   totalTranAmt, 
-            loadSpsRecord :  loadSpsRecord, 
-            spsdatesps :     spsdatesps, 
-            internalidSps :  internalidSps, 
-            spsreferenceNum : spsreferenceNum, 
-            invoiceNumber :  invoiceNumber
+            if(_logValidation(spsreferenceNum)){
+            createCheck.setValue({
+              fieldId:'memo',
+              value:spsreferenceNum
+            });
           }
-          //function is use for crate single journal entry record from sum of adjustment amount and sps net paid amount
-          createJournalEntry(JeObject);
 
-          // log.debug('checkboxarr', checkboxValueArr);
+       
+            createCheck.setValue({
+              fieldId:'account',
+              value:551
+            });
+          
 
-          //function is use for set true on checkbox present at line level in sps payment order record.
-          setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr);
+       
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'account',
+              value:322,
+              line:0
+            });
+      
 
-          log.debug('SPS Record with Internal ID updated --->', internalidSps)
+             if(_logValidation(spsmicrofilm)){
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'memo',
+              value:spsmicrofilm,
+              line:0
+            });
+          }
 
-          //send mail to receiptant for # of payment record created and already created.
-          sendPaymentRecordMail(checkboxValueArr);
+         
+            spsadjustAmt = Math.abs(spsadjustAmt);
 
+            createCheck.setSublistValue({
+              sublistId:'expense',
+              fieldId:'amount',
+              value:spsadjustAmt,
+              line:0
+            });
+          
 
+            let payment_id = createCheck.save({
+              enableSourcing: true,
+              ignoreMandatoryFields: true
+            });
+
+            if (_logValidation(payment_id)) {
+
+            log.audit(`Created Check Record from Invoice Number ${invoiceNumber}`,`Check Id ${payment_id}`);
+
+            checkboxValueArr.push({
+              key: internalidSps,
+              lineId: lineId,
+              bool: true,
+              invoiceNumber: invoiceNumber,
+              payment_id: payment_id
+
+            });
+          }
+
+          }
+      
+          else {
+            log.audit(
+              `No valid payment record found for SPS Record --> ${internalidSps}`,
+              `Invoice Number ${invoiceNumber}`
+            )
+
+            //else invoice record not found then push invoice number and line id
+            checkboxValueArr.push({
+              key: internalidSps,
+              lineId: lineId,
+              bool: true,
+              invoiceNumber: invoiceNumber,
+              payment_id: payment_id
+
+            })
+          }
         }
       }
+      }
+   
+        // log.debug('checkboxarr', checkboxValueArr);
+
+        setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr);
+
+        //set isPaymentCreated checkbox value is true in setCheckboxValueOnSps() function
+        // setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr);
+
+        log.debug('SPS Record with Internal ID updated --->', internalidSps)
+
+        //send mail to receiptant for # of payment record created and already created.
+        sendPaymentRecordMail(checkboxValueArr);
+
+    
+      }
+    }
       catch (e) {
 
         log.error('error in aftersubmit', e.toString());
@@ -432,117 +397,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
 
     /**
-     * function is use for crate single journal entry record from sum of adjustment amount and sps net paid amount
-     * @param {object} JeObject - contains parameters to set value on line item
-     * @since 2015.2
-     */
-    function createJournalEntry(JeObject) {
-
-      var { totalTranAmt, 
-        loadSpsRecord, 
-        spsdatesps, 
-        internalidSps, 
-        spsreferenceNum,
-        invoiceNumber} = JeObject;
-        
-      if (_logValidation(totalTranAmt)) {
-
-        totalTranAmt = Math.abs(totalTranAmt);
-
-        loadSpsRecord.setValue({
-          fieldId: 'custbody_sps_cx_amount',
-          value: totalTranAmt
-        });
-
-        //create journal entry record
-        let createJE = record.create({
-          type: 'journalentry',
-        });
-
-        if (_logValidation(spsdatesps)) {
-          createJE.setValue({
-            fieldId: 'trandate',
-            value: spsdatesps
-          });
-        }
-        createJE.setValue({
-          fieldId: 'subsidiary',
-          value: 2
-        });
-
-        createJE.setValue({
-          fieldId: 'custbody_gbs_payment_order',
-          value: internalidSps
-        });
-
-        if (_logValidation(spsreferenceNum)) {
-          createJE.setValue({
-            fieldId: 'memo',
-            value: spsreferenceNum
-          });
-        }
-
-        createJE.setSublistValue({
-          sublistId: 'line',
-          fieldId: 'account',
-          value: 551,
-          line: 0
-        });
-
-
-        createJE.setSublistValue({
-          sublistId: 'line',
-          fieldId: 'credit',
-          value: totalTranAmt,
-          line: 0
-        });
-
-        if (_logValidation(spsreferenceNum)) {
-          createJE.setSublistValue({
-            sublistId: 'line',
-            fieldId: 'memo',
-            value: spsreferenceNum,
-            line: 0
-          });
-        }
-
-
-        createJE.setSublistValue({
-          sublistId: 'line',
-          fieldId: 'account',
-          value: 221,
-          line: 1
-        });
-
-        createJE.setSublistValue({
-          sublistId: 'line',
-          fieldId: 'debit',
-          value: totalTranAmt,
-          line: 1
-        });
-
-
-        if (_logValidation(spsreferenceNum)) {
-          createJE.setSublistValue({
-            sublistId: 'line',
-            fieldId: 'memo',
-            value: spsreferenceNum,
-            line: 1
-          });
-        }
-
-        //save journal entry record.
-        let je_id = createJE.save();
-
-        if (_logValidation(je_id)) {
-
-          log.audit(`Created Journal Entry Record from Invoice Number ${invoiceNumber}`, `Journal Entry Id ${je_id}`);
-
-        }
-      }
-    }
-
-    /**
      * function use to set isPaymentCreated checkbox value to true on the basis of present invoice number in checkboxValueArr
      * @param {Record} loadSpsRecord - load sps payment order record 
      * @param {Array} checkboxValueArr - array of object contain payment and sps record data
@@ -550,105 +404,107 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
      */
     function setCheckboxValueOnSps(loadSpsRecord, checkboxValueArr) {
 
-      try {
-        let spsInvDocNumLength = checkboxValueArr.length;
+    try{
+      let spsInvDocNumLength = checkboxValueArr.length;
 
-        for (let i = 0; i < spsInvDocNumLength; i++) {
+      for (let i = 0; i < spsInvDocNumLength; i++) {
 
-          if (_logValidation(checkboxValueArr[i].payment_id || _logValidation(checkboxValueArr[i].alreadyCreated))) {
-            let spsInvDocNumVal = checkboxValueArr[i].lineId;
-
-            //find line with invoice number 
-            let lineNumber = loadSpsRecord.findSublistLineWithValue({
-              sublistId: 'line',
-              fieldId: 'line',
-              value: spsInvDocNumVal
-            });
-
-            //set true to isPaymentCreated checkox on the basis of present invoice number in checkboxValueArr
-            loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
-              value: checkboxValueArr[i].bool,
-              line: lineNumber
-            });
-          }
-        }
-
-        //save sps payment order record
-        let spsRecId = loadSpsRecord.save({
-          enableSourcing: true,
-          ignoreMandatoryFields: true
+        if(_logValidation(checkboxValueArr[i].payment_id || _logValidation(checkboxValueArr[i].alreadyCreated)))
+        {
+        let spsInvDocNumVal = checkboxValueArr[i].lineId;
+        
+        //find line with invoice number 
+        let lineNumber = loadSpsRecord.findSublistLineWithValue({
+          sublistId: 'line',
+          fieldId: 'line',
+          value: spsInvDocNumVal
         });
 
-        log.audit(`Set checkbox value true on line item of SPS Record --> ${spsRecId}`, spsRecId);
-      } catch (e) {
-        log.error('error in setCheckboxValueOnSps', e.toString());
+        //set true to isPaymentCreated checkox on the basis of present invoice number in checkboxValueArr
+        loadSpsRecord.setSublistValue({
+          sublistId: 'line',
+          fieldId: 'custcol_gbs_ispaymentcreate',
+          value: checkboxValueArr[i].bool,
+          line: lineNumber
+        });
       }
+      }
+
+      //save sps payment order record
+      let spsRecId = loadSpsRecord.save({
+        enableSourcing: true,
+        ignoreMandatoryFields: true
+      });
+
+      log.audit(`Set checkbox value true on line item of SPS Record --> ${spsRecId}`,spsRecId);
+    }catch(e){
+      log.error('error in setCheckboxValueOnSps', e.toString());
+    }
     }
 
-
-    /**
-    * function is use to send status email of payemnt record created and already created record
-    * @param {Array} checkboxValueArr - array of object contain payment and sps record data
-    * @since 2015.2
-    */
+    
+     /**
+     * function is use to send status email of payemnt record created and already created record
+     * @param {Array} checkboxValueArr - array of object contain payment and sps record data
+     * @since 2015.2
+     */
     function sendPaymentRecordMail(checkboxValueArr) {
-      try {
-        let body = `Dear User, 
+      try{
+      let body = `Dear User, 
 
                       [SPS] 820 Payment Order Custom Record has been Processed with following payment records created. 
                       Please click on the link to navigate to the payment record.
                       
                       `;
 
-        //get netsuite account id             
-        let accountID = runtime.accountId;
-        //get domain of account
-        let resolvedDomain = url.resolveDomain({
-          hostType: url.HostType.APPLICATION,
-          accountId: accountID
-        });
-        resolvedDomain = 'https://' + '' + resolvedDomain;
+      //get netsuite account id             
+      let accountID = runtime.accountId;
+      //get domain of account
+      let resolvedDomain = url.resolveDomain({
+        hostType: url.HostType.APPLICATION,
+        accountId: accountID
+      });
+      resolvedDomain = 'https://' + '' + resolvedDomain;
 
-        let value = checkboxValueArr;
-        // log.debug('value', value);
+      let value = checkboxValueArr;
+      // log.debug('value', value);
 
-        //iterator on checkboxValuearr array of object
-        for (const iterator of value) {
-          //log.debug('alreadyCreated', iterator.alreadyCreated)
-          if (_logValidation(iterator.alreadyCreated) || _logValidation(iterator.payment_id)) {
-            //if payment record alreadyCreted then send status mail of already creted record
-            if (iterator.alreadyCreated == 'true' || iterator.alreadyCreated == true) {
-              body += `Payment already created for invoice number ${iterator.invoiceNumber} \n`;
-            }
-            //else send status mail of payment record creted 
-            else {
-              //return record created url from payment record id
-              let paymentUrl = url.resolveRecord({
-                recordType: 'customerpayment',
-                recordId: iterator.payment_id,
-                isEditMode: false
-              });
-              body += `Payment record created with Internal ID ${iterator.payment_id} for SPS Record ${iterator.key} with Document Number ${iterator.invoiceNumber}: ${resolvedDomain + paymentUrl} \n`;
-
-            }
-          }
-          //else invoice record is not found then send status mail of not valid invoice record.
-          else {
-            body += `No valid Invoice record found with Invoice Number ${iterator.invoiceNumber} in System for Sps Record --> ${iterator.key} \n`
-          }
+      //iterator on checkboxValuearr array of object
+      for (const iterator of value) {
+        //log.debug('alreadyCreated', iterator.alreadyCreated)
+        if(_logValidation(iterator.alreadyCreated) || _logValidation(iterator.payment_id))
+        {
+          //if payment record alreadyCreted then send status mail of already creted record
+        if (iterator.alreadyCreated == 'true' || iterator.alreadyCreated == true) {
+          body += `Payment already created for invoice number ${iterator.invoiceNumber} \n`;
         }
-
-        //send email to recieptant with body
-        email.send({
-          author: 2362,
-          body: body,
-          recipients: 2362,
-          subject: `[SPS] 820 Payment Order Custom Record Processed Details`
-        });
+        //else send status mail of payment record creted 
+        else {
+          //return record created url from payment record id
+          let paymentUrl = url.resolveRecord({
+            recordType: 'customerpayment',
+            recordId: iterator.payment_id,
+            isEditMode: false
+          });
+          body += `Payment record created with Internal ID ${iterator.payment_id} for SPS Record ${iterator.key} with Document Number ${iterator.invoiceNumber}: ${resolvedDomain + paymentUrl} \n`;
+  
+        }
       }
-      catch (e) {
+      //else invoice record is not found then send status mail of not valid invoice record.
+      else{
+        body += `No valid Invoice record found with Invoice Number ${iterator.invoiceNumber} in System for Sps Record --> ${iterator.key} \n`
+      }
+      }
+
+      //send email to recieptant with body
+      email.send({
+        author: 2362,
+        body: body,
+        recipients: 2362,
+        subject: `[SPS] 820 Payment Order Custom Record Processed Details`
+      });
+    }
+      catch(e){
         log.error('error in sendPaymentRecordMail', e.toString());
       }
     }
@@ -661,190 +517,190 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
      * @since 2015.2
      */
     function getInvoiceSpsValue(finalSearchResults, i) {
-      try {
-        let invoiceId = finalSearchResults[i].internalid;
+      try{
+      let invoiceId = finalSearchResults[i].internalid;
 
-        let customerInv = finalSearchResults[i].customerId;
+      let customerInv = finalSearchResults[i].customerId;
 
-        let spsPaidAmount = finalSearchResults[i].netPaidAmt;
-        // log.debug('spsPaidAmount',spsPaidAmount)
+      let spsPaidAmount = finalSearchResults[i].netPaidAmt;
+      // log.debug('spsPaidAmount',spsPaidAmount)
 
-        let invoiceNumber = finalSearchResults[i].invoiceNumber;
+      let invoiceNumber = finalSearchResults[i].invoiceNumber;
 
-        let status = finalSearchResults[i].status;
+      let status = finalSearchResults[i].status;
 
-        let lineId = finalSearchResults[i].lineId;
+      let lineId = finalSearchResults[i].lineId;
 
-        let spsadjustAmt = finalSearchResults[i].adjustAmt;
+      let spsadjustAmt = finalSearchResults[i].adjustAmt;
 
-        let spsmicrofilm = finalSearchResults[i].microfilm;
+      let spsmicrofilm = finalSearchResults[i].microfilm;
 
-        let spsreferenceNum = finalSearchResults[i].referenceNum;
+      let spsreferenceNum = finalSearchResults[i].referenceNum;
 
-        let spsdatesps = finalSearchResults[i].datesps;
+      let spsdatesps = finalSearchResults[i].datesps;
 
-        return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps };
+      return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps };
       }
-      catch (e) {
-        log.error('error in getInvoiceSpsValue', e.toString())
+      catch(e){
+        log.error('error in getInvoiceSpsValue',e.toString())
       }
     }
 
-
-    /**
-   * function work for get all data from invoice record using search
-   * @param {Array} invoiceNumberArr - contains invoice number to search on invoice record
-   * @since 2015.2
-   */
+    
+      /**
+     * function work for get all data from invoice record using search
+     * @param {Array} invoiceNumberArr - contains invoice number to search on invoice record
+     * @since 2015.2
+     */
     function invoiceSearch(invoiceNumberArr) {
 
-      try {
+      try{
 
-        let invoiceSearch = search.create({
-          type: 'invoice',
-          filters: [
-            ['type', 'anyof', 'CustInvc'],
-            'AND',
-            invoiceNumberArr,
-            'AND',
-            ['mainline', 'is', 'T']
-            // 'AND',
-            // ['status', 'noneof', 'CustInvc:B']
-          ],
-          columns: [
-            search.createColumn({ name: 'tranid', label: 'Document Number' }),
-            search.createColumn({ name: 'entity', label: 'Name' }),
-            search.createColumn({ name: 'internalid', label: 'Internal ID' }),
-            search.createColumn({
-              name: 'transactionname',
-              label: 'Transaction Name'
-            }),
-            search.createColumn({ name: 'statusref', label: 'Status' })
-          ]
-        });
+      let invoiceSearch = search.create({
+        type: 'invoice',
+        filters: [
+          ['type', 'anyof', 'CustInvc'],
+          'AND',
+          invoiceNumberArr,
+          'AND',
+          ['mainline', 'is', 'T']
+          // 'AND',
+          // ['status', 'noneof', 'CustInvc:B']
+        ],
+        columns: [
+          search.createColumn({ name: 'tranid', label: 'Document Number' }),
+          search.createColumn({ name: 'entity', label: 'Name' }),
+          search.createColumn({ name: 'internalid', label: 'Internal ID' }),
+          search.createColumn({
+            name: 'transactionname',
+            label: 'Transaction Name'
+          }),
+          search.createColumn({ name: 'statusref', label: 'Status' })
+        ]
+      });
 
-        let searchResultInv = searchAll(invoiceSearch.run());
-        return searchResultInv;
-      }
-      catch (e) {
+      let searchResultInv = searchAll(invoiceSearch.run());
+      return searchResultInv;
+    }
+      catch(e){
         log.error('error in invoiceSearch', e.toString());
       }
     }
 
+  
+    
+      /**
+     * function is use to get line level data from sps payment order record 
+     * @param {Record} loadSpsRecord - load sps payment order record 
+     * @param {number} i - position of element in array
+     * @since 2015.2
+     */
+    function getSpsLineData(loadSpsRecord,i) {
+      try{
+
+      let invoiceNumber = loadSpsRecord.getSublistValue({
+        sublistId: 'line',
+        fieldId: 'custcol_sps_cx_invoicenumber',
+        line:i
+      });
+
+      let netPaidAmt = loadSpsRecord.getSublistValue({
+        sublistId: 'line',
+        fieldId: 'custcol_sps_cx_netpaidamt',
+        line:i
+      });
 
 
-    /**
-   * function is use to get line level data from sps payment order record 
-   * @param {Record} loadSpsRecord - load sps payment order record 
-   * @param {number} i - position of element in array
-   * @since 2015.2
-   */
-    function getSpsLineData(loadSpsRecord, i) {
-      try {
+      let lineId = loadSpsRecord.getSublistValue({
+        sublistId: 'line',
+        fieldId: 'line',
+        line:i
+      });
 
-        let invoiceNumber = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_sps_cx_invoicenumber',
-          line: i
-        });
+      let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
+        sublistId: 'line',
+        fieldId: 'custcol_gbs_ispaymentcreate',
+        line:i
+      });
 
-        let netPaidAmt = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_sps_cx_netpaidamt',
-          line: i
-        });
+      let adjustAmt = loadSpsRecord.getSublistValue({
+        sublistId:'line',
+        fieldId: 'custcol_sps_cx_adjamount',
+        line:i
+      });
 
+      let microfilm = loadSpsRecord.getSublistValue({
+        sublistId:'line',
+        fieldId: 'custcol_sps_cx_microfilmnum',
+        line:i
+      });
 
-        let lineId = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'line',
-          line: i
-        });
+      let referenceNum = loadSpsRecord.getValue({
+        sublistId:'line',
+        fieldId: 'custbody_sps_cx_refnum',
+        line:i
+      });
 
-        let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_gbs_ispaymentcreate',
-          line: i
-        });
-
-        let adjustAmt = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_sps_cx_adjamount',
-          line: i
-        });
-
-        let microfilm = loadSpsRecord.getSublistValue({
-          sublistId: 'line',
-          fieldId: 'custcol_sps_cx_microfilmnum',
-          line: i
-        });
-
-        let referenceNum = loadSpsRecord.getValue({
-          sublistId: 'line',
-          fieldId: 'custbody_sps_cx_refnum',
-          line: i
-        });
-
-        let datesps = loadSpsRecord.getValue({
-          sublistId: 'line',
-          fieldId: 'trandate',
-          line: i
-        });
+      let datesps = loadSpsRecord.getValue({
+        sublistId:'line',
+        fieldId: 'trandate',
+        line:i
+      });
 
 
-        // log.debug('invoicenumber + netPaidAmt + lineId + paymentCreateCheckbox',invoiceNumber + netPaidAmt + lineId + paymentCreateCheckbox)
+      // log.debug('invoicenumber + netPaidAmt + lineId + paymentCreateCheckbox',invoiceNumber + netPaidAmt + lineId + paymentCreateCheckbox)
 
-        return {
-          invoiceNumber,
-          netPaidAmt,
-          lineId,
-          paymentCreateCheckbox,
-          adjustAmt,
-          microfilm,
-          referenceNum,
-          datesps
-        }
+      return {
+        invoiceNumber,
+        netPaidAmt,
+        lineId,
+        paymentCreateCheckbox,
+        adjustAmt,
+        microfilm,
+        referenceNum,
+        datesps
       }
-      catch (e) {
+    }
+      catch(e){
         log.error('error in setCheckboxValueOnSps', e.toString());
       }
     }
 
-
-    /**
-* function is use to get invoice search values from searchResultInv search
-* @param {Array} searchResultInv - get all invoice search result data
-* @param {number} i - position of element in array
-* @since 2015.2
-*/
+    
+         /**
+     * function is use to get invoice search values from searchResultInv search
+     * @param {Array} searchResultInv - get all invoice search result data
+     * @param {number} i - position of element in array
+     * @since 2015.2
+     */
     function getInvoiceSearchFields(searchResultInv, i) {
-      try {
-        let tranid = searchResultInv[i].getValue({
-          name: 'tranid',
-          label: 'Document Number'
-        })
-        let customer = searchResultInv[i].getValue({
-          name: 'entity',
-          label: 'Name'
-        })
-        let internalid = searchResultInv[i].getValue({
-          name: 'internalid',
-          label: 'Internal ID'
-        })
-        let transactionname = searchResultInv[i].getValue({
-          name: 'transactionname',
-          label: 'Transaction Name'
-        })
-        let status = searchResultInv[i].getValue({
-          name: 'statusref',
-          label: 'Status'
-        })
+      try{
+      let tranid = searchResultInv[i].getValue({
+        name: 'tranid',
+        label: 'Document Number'
+      })
+      let customer = searchResultInv[i].getValue({
+        name: 'entity',
+        label: 'Name'
+      })
+      let internalid = searchResultInv[i].getValue({
+        name: 'internalid',
+        label: 'Internal ID'
+      })
+      let transactionname = searchResultInv[i].getValue({
+        name: 'transactionname',
+        label: 'Transaction Name'
+      })
+      let status = searchResultInv[i].getValue({
+        name: 'statusref',
+        label: 'Status'
+      })
 
-        // log.debug('tranid cust ',tranid + customer)
+      // log.debug('tranid cust ',tranid + customer)
 
-        return { tranid, customer, internalid, transactionname, status }
-      }
-      catch (e) {
+      return { tranid, customer, internalid, transactionname, status }
+    }
+      catch(e){
         log.error('error in setCheckboxValueOnSps', e.toString());
       }
     }
@@ -878,7 +734,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       return allResults
     }
 
-
+    
     /**
      * log validation to check value is null or undefined if true then execute next process else false
      * @param {number} value - pass variable name
