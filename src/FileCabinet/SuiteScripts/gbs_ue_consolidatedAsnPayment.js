@@ -46,6 +46,39 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         var finalSearchResults = []
         var invoiceNumberArr = []
 
+        var consolidatedAsnPaymentScript = runtime.getCurrentScript();
+
+        var paymentCustomer = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_sps_cust_id",
+        });
+
+        // log.debug('paymentCustomer',paymentCustomer);
+
+        var checkAccount = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_sps_check_acc_id",
+        });
+
+        // log.debug('checkAccount',checkAccount);
+
+        var checkExpenseAccount = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_check_expense_account_id",
+        });
+
+        // log.debug('checkExpenseAccount',checkExpenseAccount);
+
+
+        var jeSubsidiary = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_je_subsidiary",
+        });
+
+        var jeCreditAcct = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_je_credit_account",
+        });
+
+        var jeDebitAcct = consolidatedAsnPaymentScript.getParameter({
+          name: "custscript_je_debit_account",
+        });
+
         //load [sps]820 Payment order record
         var loadSpsRecord = record.load({
           type: 'customtransaction_sps_cx_820_basic',
@@ -70,7 +103,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             adjustAmt,
             microfilm,
             referenceNum,
-            datesps
+            datesps,
+            remittanceDisc
           } = getSpsLineData(loadSpsRecord, i)
 
           // log.debug('payment create checkbox',paymentCreateCheckbox);
@@ -88,7 +122,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               adjustAmt: adjustAmt,
               microfilm: microfilm,
               referenceNum: referenceNum,
-              datesps: datesps
+              datesps: datesps,
+              remittanceDisc: remittanceDisc
             })
             // log.debug('finalsearchresult',finalSearchResults)
             //push criteria of invoice number into invoiceNumberArr 
@@ -171,7 +206,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           for (let i = 0; i < finalSearchResultsLength; i++) {
 
             //get all invoice record and sps record data values from getInvoiceSpsValue() function
-            var { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps } = getInvoiceSpsValue(finalSearchResults, i);
+            var { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps, spsDisc } = getInvoiceSpsValue(finalSearchResults, i);
             // log.debug('invoice id',invoiceId)
 
             //get remittance checkbox value from customer record
@@ -232,13 +267,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                   if (lineNo != -1) {
 
                     var paymentObject = {
-                      invoiceToPayment: invoiceToPayment, 
-                      spsPaidAmount:    spsPaidAmount, 
-                      internalidSps:    internalidSps,
-                       lineNo:           lineNo, 
-                       invoiceNumber:    invoiceNumber, 
-                       checkboxValueArr: checkboxValueArr,
-                      lineId:           lineId
+                      invoiceToPayment: invoiceToPayment,
+                      spsPaidAmount: spsPaidAmount,
+                      internalidSps: internalidSps,
+                      lineNo: lineNo,
+                      invoiceNumber: invoiceNumber,
+                      checkboxValueArr: checkboxValueArr,
+                      lineId: lineId,
+                      spsDisc: spsDisc,
                     }
 
                     //function is use for apply invoice and amount on customer payment record.
@@ -257,18 +293,20 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
                   var checkApplyObj = {
 
-                    createCheck:      createCheck, 
-                    internalidSps:    internalidSps, 
-                    spsdatesps:       spsdatesps, 
-                    spsreferenceNum:  spsreferenceNum, 
-                    spsmicrofilm:     spsmicrofilm, 
-                    spsadjustAmt:     spsadjustAmt, 
-                    checkboxValueArr: checkboxValueArr, 
-                    lineId:           lineId, 
-                    invoiceNumber:    invoiceNumber
-
+                    createCheck: createCheck,
+                    internalidSps: internalidSps,
+                    spsdatesps: spsdatesps,
+                    spsreferenceNum: spsreferenceNum,
+                    spsmicrofilm: spsmicrofilm,
+                    spsadjustAmt: spsadjustAmt,
+                    checkboxValueArr: checkboxValueArr,
+                    lineId: lineId,
+                    invoiceNumber: invoiceNumber,
+                    paymentCustomer: paymentCustomer,
+                    checkAccount:checkAccount,
+                    checkExpenseAccount:checkExpenseAccount,
                   }
-             
+
                   //function is use for set account and amount on expense subtab line level
                   spsadjustAmt = applyCheckFromAdjstAmt(checkApplyObj);
 
@@ -307,12 +345,15 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           }
 
           var JeObject = {
-            totalTranAmt :   totalTranAmt, 
-            loadSpsRecord :  loadSpsRecord, 
-            spsdatesps :     spsdatesps, 
-            internalidSps :  internalidSps, 
-            spsreferenceNum : spsreferenceNum, 
-            invoiceNumber :  invoiceNumber
+            totalTranAmt: totalTranAmt,
+            loadSpsRecord: loadSpsRecord,
+            spsdatesps: spsdatesps,
+            internalidSps: internalidSps,
+            spsreferenceNum: spsreferenceNum,
+            invoiceNumber: invoiceNumber,
+            jeSubsidiary:jeSubsidiary,
+            jeCreditAcct:jeCreditAcct,
+            jeDebitAcct:jeDebitAcct
           }
           //function is use for crate single journal entry record from sum of adjustment amount and sps net paid amount
           createJournalEntry(JeObject);
@@ -341,19 +382,19 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
     }
 
-   /**
-     * function is use for set account and amount on expense subtab line level
-     * @param {object} checkApplyObj - contains parameters to set value on line item
-     * @since 2015.2
-     */
+    /**
+      * function is use for set account and amount on expense subtab line level
+      * @param {object} checkApplyObj - contains parameters to set value on line item
+      * @since 2015.2
+      */
     function applyCheckFromAdjstAmt(checkApplyObj) {
 
-      var  {createCheck, internalidSps, spsdatesps, spsreferenceNum, spsmicrofilm, spsadjustAmt, checkboxValueArr, lineId, invoiceNumber} = checkApplyObj;
+      var { createCheck, internalidSps, spsdatesps, spsreferenceNum, spsmicrofilm, spsadjustAmt, checkboxValueArr, lineId, invoiceNumber,paymentCustomer,checkAccount,checkExpenseAccount } = checkApplyObj;
 
       //set 10 Home Depot payee on entity field
       createCheck.setValue({
         fieldId: 'entity',
-        value: 119
+        value: paymentCustomer
       });
 
       //set 820 payment record on payment order field.
@@ -379,7 +420,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       //set Home Depot Clearing account on accont field (body level) 
       createCheck.setValue({
         fieldId: 'account',
-        value: 551
+        value: checkAccount
       });
 
 
@@ -391,7 +432,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       createCheck.setCurrentSublistValue({
         sublistId: 'expense',
         fieldId: 'account',
-        value: 322,
+        value: checkExpenseAccount,
         ignoreFieldChange: true
       });
 
@@ -426,21 +467,22 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       return spsadjustAmt;
     }
 
-      /**
-     * function is use for apply invoice and amount on customer payment record.
-     * @param {object} paymentObject - contains parameters to set value on line item
-     * @since 2015.2
-     */
+    /**
+   * function is use for apply invoice and amount on customer payment record.
+   * @param {object} paymentObject - contains parameters to set value on line item
+   * @since 2015.2
+   */
     function applyInvoiceOnPayment(paymentObject) {
 
-      var{
-        invoiceToPayment, 
-        spsPaidAmount ,
+      var {
+        invoiceToPayment,
+        spsPaidAmount,
         internalidSps,
-         lineNo ,
-         invoiceNumber ,
-         checkboxValueArr,
+        lineNo,
+        invoiceNumber,
+        checkboxValueArr,
         lineId,
+        spsDisc,
       } = paymentObject;
 
       invoiceToPayment.setValue({
@@ -459,6 +501,15 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         line: lineNo,
         value: true
       });
+
+      if (_logValidation(spsDisc)) {
+        invoiceToPayment.setSublistValue({
+          sublistId: 'apply',
+          fieldId: 'disc',
+          line: lineNo,
+          value: spsDisc
+        });
+      }
 
       invoiceToPayment.setSublistValue({
         sublistId: 'apply',
@@ -498,13 +549,16 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
      */
     function createJournalEntry(JeObject) {
 
-      var { totalTranAmt, 
-        loadSpsRecord, 
-        spsdatesps, 
-        internalidSps, 
+      var { totalTranAmt,
+        loadSpsRecord,
+        spsdatesps,
+        internalidSps,
         spsreferenceNum,
-        invoiceNumber} = JeObject;
-        
+        invoiceNumber,
+        jeSubsidiary,
+        jeCreditAcct,
+        jeDebitAcct } = JeObject;
+
       if (_logValidation(totalTranAmt)) {
 
         totalTranAmt = Math.abs(totalTranAmt);
@@ -527,7 +581,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         }
         createJE.setValue({
           fieldId: 'subsidiary',
-          value: 2
+          value: jeSubsidiary
         });
 
         createJE.setValue({
@@ -545,7 +599,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         createJE.setSublistValue({
           sublistId: 'line',
           fieldId: 'account',
-          value: 551,
+          value: jeCreditAcct,
           line: 0
         });
 
@@ -570,7 +624,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         createJE.setSublistValue({
           sublistId: 'line',
           fieldId: 'account',
-          value: 221,
+          value: jeDebitAcct,
           line: 1
         });
 
@@ -726,6 +780,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
         let customerInv = finalSearchResults[i].customerId;
 
+        let spsDisc = finalSearchResults[i].remittanceDisc;
+
         let spsPaidAmount = finalSearchResults[i].netPaidAmt;
         // log.debug('spsPaidAmount',spsPaidAmount)
 
@@ -743,7 +799,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
         let spsdatesps = finalSearchResults[i].datesps;
 
-        return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps };
+        return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsreferenceNum, spsdatesps, spsDisc };
       }
       catch (e) {
         log.error('error in getInvoiceSpsValue', e.toString())
@@ -808,6 +864,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           line: i
         });
 
+        let remittanceDisc = loadSpsRecord.getSublistValue({
+          sublistId: 'line',
+          fieldId: 'custcol_sps_cx_disc_amounttaken',
+          line: i
+        });
+
         let netPaidAmt = loadSpsRecord.getSublistValue({
           sublistId: 'line',
           fieldId: 'custcol_sps_cx_netpaidamt',
@@ -862,7 +924,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           adjustAmt,
           microfilm,
           referenceNum,
-          datesps
+          datesps,
+          remittanceDisc
         }
       }
       catch (e) {
