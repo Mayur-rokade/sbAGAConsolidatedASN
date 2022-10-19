@@ -56,9 +56,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           fieldId: 'custbody_sps_cx_tpid',
         });
 
+        //if 'SPS CX TRADING PARTNER ID' field is undefined then script will not execute else it will execute on the basis of partner id. 
         if (_logValidation(spsTradingPartnerId)) {
 
-          var { paymentCustomer, checkAccount, checkExpenseAccount, jeSubsidiary, jeCreditAcct, jeDebitAcct } = scriptParameter();
+          //get script parameter from scriptParameter() function.
+          paramObj = scriptParameter();
+
+          var { homeDepotCust, targetCust, macyCust, homeDepotAcct, homeDepotCheckExpenseAcct, targetAccount, targetCheckExpenseAcct, macysAcct, macysCheckExpenseAcct, jeSubsidiary, 
+            homeDepotJeDebitAcct} = paramObj;
 
 
           //get line count of sps payment order record
@@ -74,7 +79,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             fieldId: 'trandate',
           });
 
-          var totalNetPaidAmt = 0;
 
           //iterate on length of sps line count
           for (let i = 0; i < getLineCountSps; i++) {
@@ -88,14 +92,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               adjustAmt,
               microfilm,
               remittanceDisc,
+              preDiscAmt
             } = getSpsLineData(loadSpsRecord, i)
 
             // log.debug('payment create checkbox',paymentCreateCheckbox);
 
-            //validation to check isCreatedPayment checkbox value is false and invoice number and net paid amount is not blank
+            //condition for check isCreatedPayment line level checkbox value is false and invoice number and net paid amount is not blank then push payment related data to array
             if (paymentCreateCheckbox == false && _logValidation(invoiceNumber) && _logValidation(netPaidAmt)) {
-
-              totalNetPaidAmt += netPaidAmt;
 
               //push all line level data of invoice number and net paid ammount in finalSearchResults array
               finalSearchResults.push({
@@ -105,17 +108,18 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                 lineId: lineId,
                 internalidSps: internalidSps,
                 microfilm: microfilm,
+                preDiscAmt:preDiscAmt
               })
               // log.debug('finalsearchresult',finalSearchResults)
+
               //push criteria of invoice number into invoiceNumberArr 
               invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
             }
+            //condition for check isCreatedPayment line level checkbox is false and adjustment amount is not blank then push check related data to array
             else if (paymentCreateCheckbox == false && _logValidation(adjustAmt)) {
 
               finalSearchResults.push({
                 lineNo: i,
-                // invoiceNumber: invoiceNumber,
-                // netPaidAmt: netPaidAmt,
                 lineId: lineId,
                 internalidSps: internalidSps,
                 adjustAmt: adjustAmt,
@@ -123,6 +127,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                 remittanceDisc: remittanceDisc,
               })
             }
+            
           }
           invoiceNumberArr.pop();
 
@@ -184,7 +189,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             }
           }
 
-          log.debug('finalSearchResults', finalSearchResults)
+          // log.debug('finalSearchResults', finalSearchResults)
 
           if (_logValidation(finalSearchResults)) {
 
@@ -197,13 +202,16 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
             var checkAndPaymentBodyObj = {
               spsTradingPartnerId: spsTradingPartnerId,
-              paymentCustomer: paymentCustomer,
+              homeDepotCust: homeDepotCust,
+              targetCust: targetCust,
+              macyCust: macyCust,
               custPaymentCheckJE: custPaymentCheckJE,
-              checkAccount: checkAccount,
               internalidSps: internalidSps,
               spsdatesps: spsdatesps,
               spsreferenceNum: spsreferenceNum,
-              totalNetPaidAmt: totalNetPaidAmt
+              homeDepotAcct: homeDepotAcct,
+              targetAccount: targetAccount,
+              macysAcct: macysAcct
             };
 
             //create check record from adjustment amount
@@ -214,7 +222,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             for (let i = 0; i < finalSearchResultsLength; i++) {
 
               //get all invoice record and sps record data values from getInvoiceSpsValue() function
-              var { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsDisc, } = getInvoiceSpsValue(finalSearchResults, i);
+              var { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsDisc, spsPreDiscAmt} = getInvoiceSpsValue(finalSearchResults, i);
               // log.debug('invoice id',invoiceId)
 
               // log.debug('invoiceNumber',invoiceNumber)
@@ -231,15 +239,17 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
                   createCheck: createCheck,
                   internalidSps: internalidSps,
-                  spsdatesps: spsdatesps,
-                  spsreferenceNum: spsreferenceNum,
                   spsmicrofilm: spsmicrofilm,
                   spsadjustAmt: spsadjustAmt,
                   checkboxValueArr: checkboxValueArr,
                   lineId: lineId,
-                  paymentCustomer: paymentCustomer,
-                  checkAccount: checkAccount,
-                  checkExpenseAccount: checkExpenseAccount,
+                  homeDepotCheckExpenseAcct: homeDepotCheckExpenseAcct,
+                  targetCheckExpenseAcct: targetCheckExpenseAcct,
+                  macysCheckExpenseAcct: macysCheckExpenseAcct,
+                  spsTradingPartnerId: spsTradingPartnerId,
+                  homeDepotCust: homeDepotCust,
+                  targetCust: targetCust,
+                  macyCust: macyCust
                 }
 
                 //function is use for set account and amount on expense subtab line level
@@ -317,13 +327,11 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                         checkboxValueArr: checkboxValueArr,
                         lineId: lineId,
                         spsDisc: spsDisc,
-                        spsTradingPartnerId: spsTradingPartnerId,
-                        checkAccount: checkAccount,
-                        customerInv: customerInv,
-                        spsdatesps: spsdatesps,
-                        spsreferenceNum: spsreferenceNum,
-                        finalSearchResultsLength: finalSearchResultsLength,
-                        i: i
+                        spsTradingPartnerId:spsTradingPartnerId,
+                        homeDepotCust:homeDepotCust,
+                        targetCust:targetCust,
+                        macyCust:macyCust,
+                        spsPreDiscAmt:spsPreDiscAmt
                       }
 
                       //function is use for apply invoice and amount on customer payment record.
@@ -400,8 +408,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
                 spsreferenceNum: spsreferenceNum,
                 invoiceNumber: invoiceNumber,
                 jeSubsidiary: jeSubsidiary,
-                jeCreditAcct: jeCreditAcct,
-                jeDebitAcct: jeDebitAcct
+                homeDepotAcct:homeDepotAcct,
+                homeDepotJeDebitAcct:homeDepotJeDebitAcct,
+                targetAccount:targetAccount,
+                macysAcct:macysAcct,
+                spsTradingPartnerId:spsTradingPartnerId,
+                homeDepotCust:homeDepotCust,
+                targetCust:targetCust,
+                macyCust:macyCust
               }
               //function is use for crate single journal entry record from sum of adjustment amount and sps net paid amount
               createJournalEntry(JeObject);
@@ -434,7 +448,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
     function checkAndPaymentBody(checkAndPaymentBodyObj) {
 
-      var {spsTradingPartnerId, paymentCustomer, custPaymentCheckJE, checkAccount, internalidSps, spsdatesps, spsreferenceNum, totalNetPaidAmt} = checkAndPaymentBodyObj;
+      var { spsTradingPartnerId, homeDepotCust, targetCust, macyCust, custPaymentCheckJE, internalidSps, spsdatesps, spsreferenceNum, homeDepotAcct, targetAccount, macysAcct } = checkAndPaymentBodyObj;
 
       var createCheck = record.create({
         type: 'check',
@@ -446,32 +460,83 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         isDynamic: true
       });
 
-      let finalCustomer = spsTradingPartnerId == paymentCustomer ? spsTradingPartnerId : custPaymentCheckJE;
+      // let finalCustomer = spsTradingPartnerId == homeDepotCust ? spsTradingPartnerId : custPaymentCheckJE;
 
-      createCheck.setValue({
-        fieldId: 'entity',
-        value: finalCustomer
-      });
+      if (spsTradingPartnerId === homeDepotCust) {
 
-      // log.debug('customer for payment je check',custPaymentCheckJE);
-      invoiceToPayment.setValue({
-        fieldId: 'customer',
-        value: finalCustomer
-      });
+        createCheck.setValue({
+          fieldId: 'entity',
+          value: homeDepotCust
+        });
 
-      if (spsTradingPartnerId == paymentCustomer) {
+        // log.debug('customer for payment je check',custPaymentCheckJE);
+        invoiceToPayment.setValue({
+          fieldId: 'customer',
+          value: homeDepotCust
+        });
 
         //set Home Depot Clearing account on accont field (body level) 
         createCheck.setValue({
           fieldId: 'account',
-          value: checkAccount
+          value: homeDepotAcct
         });
 
         invoiceToPayment.setValue({
           fieldId: 'account',
-          value: checkAccount
+          value: homeDepotAcct
         });
       }
+      else if (spsTradingPartnerId === targetCust) {
+
+        createCheck.setValue({
+          fieldId: 'entity',
+          value: targetCust
+        });
+
+        // log.debug('customer for payment je check',custPaymentCheckJE);
+        invoiceToPayment.setValue({
+          fieldId: 'customer',
+          value: targetCust
+        });
+
+        //set Home Depot Clearing account on accont field (body level) 
+        createCheck.setValue({
+          fieldId: 'account',
+          value: targetAccount
+        });
+
+        invoiceToPayment.setValue({
+          fieldId: 'account',
+          value: targetAccount
+        });
+
+      }
+      else if (spsTradingPartnerId === macyCust) {
+
+        createCheck.setValue({
+          fieldId: 'entity',
+          value: macyCust
+        });
+
+        // log.debug('customer for payment je check',custPaymentCheckJE);
+        invoiceToPayment.setValue({
+          fieldId: 'customer',
+          value: macyCust
+        });
+
+        //set Home Depot Clearing account on accont field (body level) 
+        createCheck.setValue({
+          fieldId: 'account',
+          value: macysAcct
+        });
+
+        invoiceToPayment.setValue({
+          fieldId: 'account',
+          value: macysAcct
+        });
+
+      }
+
 
       //set 820 payment record on payment order field.
       createCheck.setValue({
@@ -505,13 +570,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         });
       }
 
-      if (_logValidation(totalNetPaidAmt)) {
-        invoiceToPayment.setValue({
-          fieldId: 'payment',
-          value: totalNetPaidAmt
-        });
-      }
-
       invoiceToPayment.setValue({
         fieldId: 'custbody_gbs_payment_order',
         value: internalidSps
@@ -523,18 +581,44 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
       var consolidatedAsnPaymentScript = runtime.getCurrentScript();
 
-      var paymentCustomer = consolidatedAsnPaymentScript.getParameter({
-        name: "custscript_sps_cust_id",
+      var homeDepotCust = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_customer_home_depot",
       });
 
-      // log.debug('paymentCustomer',paymentCustomer);
-      var checkAccount = consolidatedAsnPaymentScript.getParameter({
-        name: "custscript_sps_check_acc_id",
+      var targetCust = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_customer_target",
+      });
+
+      var macyCust = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_customer_macy",
+      });
+
+      // log.debug('homeDepotCust',homeDepotCust);
+      var homeDepotAcct = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_home_depot_account",
       });
 
       // log.debug('checkAccount',checkAccount);
-      var checkExpenseAccount = consolidatedAsnPaymentScript.getParameter({
-        name: "custscript_check_expense_account_id",
+      var homeDepotCheckExpenseAcct = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_check_expense_home_depot_acct",
+      });
+
+      var targetAccount = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_target_account",
+      });
+
+      // log.debug('checkAccount',checkAccount);
+      var targetCheckExpenseAcct = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_target_account",
+      });
+
+      var macysAcct = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_macys_account",
+      });
+
+      // log.debug('checkAccount',checkAccount);
+      var macysCheckExpenseAcct = consolidatedAsnPaymentScript.getParameter({
+        name: "custscript_sps_macys_account",
       });
 
       // log.debug('checkExpenseAccount',checkExpenseAccount);
@@ -542,14 +626,27 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
         name: "custscript_je_subsidiary",
       });
 
-      var jeCreditAcct = consolidatedAsnPaymentScript.getParameter({
-        name: "custscript_je_credit_account",
-      });
 
-      var jeDebitAcct = consolidatedAsnPaymentScript.getParameter({
+      var homeDepotJeDebitAcct = consolidatedAsnPaymentScript.getParameter({
         name: "custscript_je_debit_account",
       });
-      return { paymentCustomer, checkAccount, checkExpenseAccount, jeSubsidiary, jeCreditAcct, jeDebitAcct };
+
+      var paramObj = {
+
+        homeDepotCust: homeDepotCust,
+        targetCust: targetCust,
+        macyCust: macyCust,
+        homeDepotAcct: homeDepotAcct,
+        homeDepotCheckExpenseAcct: homeDepotCheckExpenseAcct,
+        targetAccount: targetAccount,
+        targetCheckExpenseAcct: targetCheckExpenseAcct,
+        macysAcct: macysAcct,
+        macysCheckExpenseAcct: macysCheckExpenseAcct,
+        jeSubsidiary: jeSubsidiary,
+        homeDepotJeDebitAcct: homeDepotJeDebitAcct
+
+      }
+      return paramObj;
     }
 
     /**
@@ -561,37 +658,98 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
       try {
 
-        var { createCheck, internalidSps, spsdatesps, spsreferenceNum, spsmicrofilm, spsadjustAmt, checkboxValueArr, lineId, paymentCustomer, checkAccount, checkExpenseAccount } = checkApplyObj;
+        var { createCheck, internalidSps, spsmicrofilm, spsadjustAmt, checkboxValueArr, lineId, homeDepotCheckExpenseAcct, targetCheckExpenseAcct,
+          macysCheckExpenseAcct, spsTradingPartnerId, homeDepotCust, targetCust, macyCust } = checkApplyObj;
 
 
         createCheck.selectNewLine({
           sublistId: 'expense'
         });
 
-        //set Home Depot Chargebacks account on line level account field.
-        createCheck.setCurrentSublistValue({
-          sublistId: 'expense',
-          fieldId: 'account',
-          value: checkExpenseAccount,
-          ignoreFieldChange: true
-        });
+        if (spsTradingPartnerId === homeDepotCust) {
 
-        if (_logValidation(spsmicrofilm)) {
+          //set Home Depot Chargebacks account on line level account field.
           createCheck.setCurrentSublistValue({
             sublistId: 'expense',
-            fieldId: 'memo',
-            value: spsmicrofilm,
+            fieldId: 'account',
+            value: homeDepotCheckExpenseAcct,
+            ignoreFieldChange: true
           });
+
+          if (_logValidation(spsmicrofilm)) {
+            createCheck.setCurrentSublistValue({
+              sublistId: 'expense',
+              fieldId: 'memo',
+              value: spsmicrofilm,
+            });
+          }
+
+          //convert value from negative to positive 
+          spsadjustAmt = Math.abs(spsadjustAmt);
+
+          createCheck.setCurrentSublistValue({
+            sublistId: 'expense',
+            fieldId: 'amount',
+            value: spsadjustAmt,
+          });
+
         }
+        else if (spsTradingPartnerId === targetCust) {
 
-        //convert value from negative to positive 
-        spsadjustAmt = Math.abs(spsadjustAmt);
+          //set Home Depot Chargebacks account on line level account field.
+          createCheck.setCurrentSublistValue({
+            sublistId: 'expense',
+            fieldId: 'account',
+            value: targetCheckExpenseAcct,
+            ignoreFieldChange: true
+          });
 
-        createCheck.setCurrentSublistValue({
-          sublistId: 'expense',
-          fieldId: 'amount',
-          value: spsadjustAmt,
-        });
+          if (_logValidation(spsmicrofilm)) {
+            createCheck.setCurrentSublistValue({
+              sublistId: 'expense',
+              fieldId: 'memo',
+              value: spsmicrofilm,
+            });
+          }
+
+          //convert value from negative to positive 
+          spsadjustAmt = Math.abs(spsadjustAmt);
+
+          createCheck.setCurrentSublistValue({
+            sublistId: 'expense',
+            fieldId: 'amount',
+            value: spsadjustAmt,
+          });
+
+        }
+        else if (spsTradingPartnerId === macyCust) {
+
+          //set Home Depot Chargebacks account on line level account field.
+          createCheck.setCurrentSublistValue({
+            sublistId: 'expense',
+            fieldId: 'account',
+            value: macysCheckExpenseAcct,
+            ignoreFieldChange: true
+          });
+
+          if (_logValidation(spsmicrofilm)) {
+            createCheck.setCurrentSublistValue({
+              sublistId: 'expense',
+              fieldId: 'memo',
+              value: spsmicrofilm,
+            });
+          }
+
+          //convert value from negative to positive 
+          spsadjustAmt = Math.abs(spsadjustAmt);
+
+          createCheck.setCurrentSublistValue({
+            sublistId: 'expense',
+            fieldId: 'amount',
+            value: spsadjustAmt,
+          });
+
+        }
 
         createCheck.commitLine({
           sublistId: 'expense'
@@ -631,12 +789,11 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           lineId,
           spsDisc,
           spsTradingPartnerId,
-          checkAccount,
-          customerInv,
-          spsdatesps,
-          spsreferenceNum,
-          finalSearchResultsLength,
-          i
+          homeDepotCust,
+          targetCust,
+          macyCust,
+          spsPreDiscAmt
+  
         } = paymentObject;
 
 
@@ -645,38 +802,73 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           line: lineNo
         });
 
-        invoiceToPayment.setCurrentSublistValue({
-          sublistId: 'apply',
-          fieldId: 'apply',
-          value: true
-        });
+        if (spsTradingPartnerId === homeDepotCust) {
 
-        if (_logValidation(spsDisc)) {
           invoiceToPayment.setCurrentSublistValue({
             sublistId: 'apply',
-            fieldId: 'disc',
-            value: spsDisc
+            fieldId: 'apply',
+            value: true
           });
+  
+          if (_logValidation(spsDisc)) {
+            invoiceToPayment.setCurrentSublistValue({
+              sublistId: 'apply',
+              fieldId: 'disc',
+              value: spsDisc
+            });
+          }
+  
+          invoiceToPayment.setCurrentSublistValue({
+            sublistId: 'apply',
+            fieldId: 'amount',
+            value: spsPaidAmount
+          });
+  
         }
+        else if (spsTradingPartnerId === targetCust) {
 
-        invoiceToPayment.setCurrentSublistValue({
-          sublistId: 'apply',
-          fieldId: 'amount',
-          value: spsPaidAmount
-        });
+          invoiceToPayment.setCurrentSublistValue({
+            sublistId: 'apply',
+            fieldId: 'apply',
+            value: true
+          });
+  
+          invoiceToPayment.setCurrentSublistValue({
+            sublistId: 'apply',
+            fieldId: 'amount',
+            value: spsPaidAmount
+          });
 
+          
+        }
+        else if (spsTradingPartnerId === macyCust) {
+
+          invoiceToPayment.setCurrentSublistValue({
+            sublistId: 'apply',
+            fieldId: 'apply',
+            value: true
+          });
+  
+          invoiceToPayment.setCurrentSublistValue({
+            sublistId: 'apply',
+            fieldId: 'amount',
+            value: spsPreDiscAmt
+          });
+  
+        }
+       
         invoiceToPayment.commitLine({
           sublistId: 'apply',
         });
 
-          //push created payment record id into checkboxValueArr and other necessary data 
-          checkboxValueArr.push({
-            key: internalidSps,
-            lineId: lineId,
-            bool: true,
-            invoiceNumber: invoiceNumber,
-            payment_id: 1
-          });
+        //push created payment record id into checkboxValueArr and other necessary data 
+        checkboxValueArr.push({
+          key: internalidSps,
+          lineId: lineId,
+          bool: true,
+          invoiceNumber: invoiceNumber,
+          payment_id: 1
+        });
 
       }
       catch (e) {
@@ -701,8 +893,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           spsreferenceNum,
           invoiceNumber,
           jeSubsidiary,
-          jeCreditAcct,
-          jeDebitAcct } = JeObject;
+          homeDepotAcct,
+          homeDepotJeDebitAcct,
+          targetAccount,
+          macysAcct,
+          spsTradingPartnerId,
+          homeDepotCust,
+          targetCust,
+          macyCust } = JeObject;
 
         if (_logValidation(totalTranAmt)) {
 
@@ -743,13 +941,57 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
             });
           }
 
-          createJE.setSublistValue({
-            sublistId: 'line',
-            fieldId: 'account',
-            value: jeCreditAcct,
-            line: 0
-          });
+          if (spsTradingPartnerId === homeDepotCust) {
 
+            createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: homeDepotAcct,
+              line: 0
+            });
+
+            createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: homeDepotJeDebitAcct,
+              line: 1
+            });
+
+          }
+          else if (spsTradingPartnerId === targetCust) {
+
+     createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: targetAccount,
+              line: 0
+            });
+
+            createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: targetAccount,
+              line: 1
+            });
+
+          }
+          else if (spsTradingPartnerId === macyCust) {
+
+            createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: macysAcct,
+              line: 0
+            });
+
+            createJE.setSublistValue({
+              sublistId: 'line',
+              fieldId: 'account',
+              value: macysAcct,
+              line: 1
+            });
+
+          }
 
           createJE.setSublistValue({
             sublistId: 'line',
@@ -766,14 +1008,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
               line: 0
             });
           }
-
-
-          createJE.setSublistValue({
-            sublistId: 'line',
-            fieldId: 'account',
-            value: jeDebitAcct,
-            line: 1
-          });
 
           createJE.setSublistValue({
             sublistId: 'line',
@@ -953,8 +1187,10 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
 
         let spsmicrofilm = finalSearchResults[i].microfilm;
 
+        let spsPreDiscAmt = finalSearchResults[i].preDiscAmt;
 
-        return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsDisc, };
+
+        return { status, lineId, invoiceNumber, invoiceId, customerInv, spsPaidAmount, spsadjustAmt, spsmicrofilm, spsDisc,spsPreDiscAmt };
       }
       catch (e) {
         log.error('error in getInvoiceSpsValue', e.toString())
@@ -1019,17 +1255,17 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           line: i
         });
 
-        if(_logValidation(invoiceNumber)){
+        if (_logValidation(invoiceNumber)) {
 
           let checkInt = isNumber(invoiceNumber);
 
-          if(checkInt == true){
+          if (checkInt == true) {
 
-          invoiceNumber = invoiceNumber.toString();
+            invoiceNumber = invoiceNumber.toString();
 
-          if( invoiceNumber.charAt(0) === '0' )
-    
-          invoiceNumber = invoiceNumber.slice(1);
+            if (invoiceNumber.charAt(0) === '0')
+
+              invoiceNumber = invoiceNumber.slice(1);
 
           }
 
@@ -1072,6 +1308,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           line: i
         });
 
+        let preDiscAmt = loadSpsRecord.getSublistValue({
+          sublistId: 'line',
+          fieldId: 'custcol_sps_cx_originalamt',
+          line: i
+        });
+
+        
+
 
         // log.debug('invoicenumber + netPaidAmt + lineId + paymentCreateCheckbox',invoiceNumber + netPaidAmt + lineId + paymentCreateCheckbox)
 
@@ -1083,6 +1327,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
           adjustAmt,
           microfilm,
           remittanceDisc,
+          preDiscAmt
         }
       }
       catch (e) {
@@ -1090,7 +1335,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url'],
       }
     }
 
-    function isNumber(n) { return /^-?[\d.]+(?:e-?\d+)?$/.test(n); } 
+    function isNumber(n) { return /^-?[\d.]+(?:e-?\d+)?$/.test(n); }
 
     /**
 * function is use to get invoice search values from searchResultInv search
