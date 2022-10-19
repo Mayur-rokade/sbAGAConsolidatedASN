@@ -286,7 +286,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
               // log.debug('autoApplyRemit',autoApplyRemit)
 
               //if remittance checkbox is true then create payment, check and journal entry record.
-
               //if status is paidInFull then push alreadyCreated property into object to true and also push necessary data
               if (status === 'paidInFull') {
                 if (autoApplyRemit === true) {
@@ -349,7 +348,6 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
                 }
                 //  }
               }
-
               //else no valid payment record found on sps record
               else {
                 log.audit(
@@ -746,8 +744,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
         //convert value from negative to positive
         //spsadjustAmt = Math.abs(spsadjustAmt)
 
-        log.debug('macy', macyAmt);
-        
+        log.debug('macy 749 check amt', macyAmt);
+
         createCheck.setCurrentSublistValue({
           sublistId: 'expense',
           fieldId: 'amount',
@@ -961,14 +959,14 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
           createJE.setSublistValue({
             sublistId: 'line',
             fieldId: 'account',
-            value: 218,
+            value: 575,
             line: 0
           })
 
           createJE.setSublistValue({
             sublistId: 'line',
             fieldId: 'account',
-            value: 218,
+            value: 575,
             line: 1
           })
         } else if (spsTradingPartnerId === 540 || spsTradingPartnerId === '540') {
