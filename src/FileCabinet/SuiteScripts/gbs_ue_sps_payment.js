@@ -354,10 +354,7 @@ define(["N/email", "N/record", "N/runtime", "N/search", "N/url"], function (
             value: true,
           });
         }
-      } else if (
-        spsTradingPartnerId === 177282 ||
-        spsTradingPartnerId === "177282"
-      ) {
+      } else if (spsTradingPartnerId === 177282 ||spsTradingPartnerId === "177282" ) {
         let preDiscObj = {};
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
@@ -954,6 +951,7 @@ define(["N/email", "N/record", "N/runtime", "N/search", "N/url"], function (
           });
         }
       }
+      
       loadSpsRecord.save();
     } catch (e) {
       log.debug({
