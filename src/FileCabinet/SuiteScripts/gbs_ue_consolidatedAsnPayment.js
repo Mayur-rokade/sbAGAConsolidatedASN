@@ -112,7 +112,8 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
               lineId: lineId,
               internalidSps: internalidSps,
               microfilm: microfilm,
-              preDiscAmt: preDiscAmt
+              preDiscAmt: preDiscAmt,
+              invoiceNumber:invoiceNumber
             })
             // log.debug('finalsearchresult',finalSearchResults)
 
@@ -122,7 +123,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
           //condition for check isCreatedPayment line level checkbox is false and adjustment amount is not blank then push check related data to array
           else if (
             paymentCreateCheckbox == false &&
-            _logValidation(adjustAmt)
+            _logValidation(adjustAmt) 
           ) {
             finalSearchResults.push({
               lineNo: i,
@@ -130,24 +131,39 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
               internalidSps: internalidSps,
               adjustAmt: adjustAmt,
               microfilm: microfilm,
-              remittanceDisc: remittanceDisc
+              remittanceDisc: remittanceDisc,
+              invoiceNumber:invoiceNumber
             })
+            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
+
+          } else if ( paymentCreateCheckbox == false && spsTradingPartnerId == 537 && _logValidation(invoiceNumber) && preDiscAmt) {
+            //MACY ignore positive lines with missing invoice number
+            finalSearchResults.push({
+              lineNo: i,
+              lineId: lineId,
+              internalidSps: internalidSps,
+              adjustAmt: adjustAmt,
+              microfilm: microfilm,
+              remittanceDisc: remittanceDisc,
+              preDiscAmt: preDiscAmt,
+              invoiceNumber:invoiceNumber
+            })
+            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
           }
         }
         invoiceNumberArr.pop()
 
-        log.debug('finalsearchresult', finalSearchResults)
-        // log.debug('invocienumberarr',invoiceNumberArr)
+        //log.debug('finalsearchresult', finalSearchResults)
+         log.debug('invocienumberarr 140',invoiceNumberArr)
         var custPaymentCheckJE
 
-        //check invoicenumberarr is not blank
+        ///check invoicenumberarr is not blank
         if (invoiceNumberArr.length != 0) {
           //pass invoice number array and get invoice search result data from invoiceSearch() function
           let searchResultInv = invoiceSearch(invoiceNumberArr)
           // log.debug('searchresultinv',searchResultInv)
 
           let invoiceResultLength = searchResultInv.length
-
           // log.debug('finalsearchresult',finalSearchResults)
 
           for (let i = 0; i < invoiceResultLength; i++) {
@@ -191,15 +207,16 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
           }
         }
 
-        // log.debug('finalSearchResults', finalSearchResults)
+         log.debug('finalSearchResults 194', finalSearchResults)
 
         if (_logValidation(finalSearchResults)) {
           let finalSearchResultsLength = finalSearchResults.length
-
           var checkboxValueArr = []
           var totalTranAmt = 0
           var temp = 0
           var tempPayment = 0
+          let MACYspsPreDiscAmtTotal = 0
+          let macyCHECKAmt = 0
 
           var checkAndPaymentBodyObj = {
             spsTradingPartnerId: spsTradingPartnerId,
@@ -220,6 +237,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
             checkAndPaymentBodyObj
           )
 
+          
           //loop to iterate on search result contain sps 820 payment order record line level data.
           for (let i = 0; i < finalSearchResultsLength; i++) {
             //get all invoice record and sps record data values from getInvoiceSpsValue() function
@@ -235,9 +253,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
               spsDisc,
               spsPreDiscAmt
             } = getInvoiceSpsValue(finalSearchResults, i)
-            // log.debug('invoice id',invoiceId)
+             log.debug('invoice id',invoiceId)
+             log.debug('invoiceNumber',invoiceNumber)
 
-            // log.debug('invoiceNumber',invoiceNumber)
+            //MACY CUSTOMER (Ignore positive lines missing SPS CX Invoice Number)
+            if (!(Math.sign(spsadjustAmt) === 1 && !_logValidation(invoiceNumber)) && spsTradingPartnerId === 537) {
+              MACYspsPreDiscAmtTotal += spsPreDiscAmt
+            }
 
             if (_logValidation(spsadjustAmt) && spsadjustAmt < 0) {
               temp++
@@ -246,13 +268,13 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
 
               //MACY AMOUNT 
               if (Math.sign(spsadjustAmt) === -1) {
-                macyAmt += macyAmt
+                macyCHECKAmt += spsadjustAmt
               } 
 
               // log.debug('totalTranAmt in check',totalTranAmt)
 
               var checkApplyObj = {
-                macyAmt:macyAmt,
+                macyCHECKAmt:macyCHECKAmt,
                 createCheck: createCheck,
                 internalidSps: internalidSps,
                 spsmicrofilm: spsmicrofilm,
@@ -340,7 +362,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
                     homeDepotCust: homeDepotCust,
                     targetCust: targetCust,
                     macyCust: macyCust,
-                    spsPreDiscAmt: spsPreDiscAmt
+                    spsPreDiscAmt: MACYspsPreDiscAmtTotal
                   }
 
                   //function is use for apply invoice and amount on customer payment record.
@@ -397,7 +419,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
           let checkJE = loadSpsRecord.getValue({
             fieldId: 'custbody_je_created'
           })
-          // log.debug('checkJE',checkJE)
+           log.debug('checkJE',checkJE)
 
           //BODY LEVEL CHECKBOX FALSE ONLY THEN CREATE
           if (checkJE == false) {
@@ -654,7 +676,7 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
   function applyCheckFromAdjstAmt (checkApplyObj) {
     try {
       var {
-        macyAmt,
+        macyCHECKAmt,
         createCheck,
         internalidSps,
         spsmicrofilm,
@@ -744,12 +766,12 @@ define(['N/email', 'N/record', 'N/runtime', 'N/search', 'N/url']
         //convert value from negative to positive
         //spsadjustAmt = Math.abs(spsadjustAmt)
 
-        log.debug('macy 749 check amt', macyAmt);
+        log.debug('macy 749 check amt', macyCHECKAmt);
 
         createCheck.setCurrentSublistValue({
           sublistId: 'expense',
           fieldId: 'amount',
-          value: macyAmt
+          value: macyCHECKAmt
         })
       }
 
