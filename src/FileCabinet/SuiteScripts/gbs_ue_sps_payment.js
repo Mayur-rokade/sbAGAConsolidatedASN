@@ -18,83 +18,83 @@
 }
 // END SCRIPT DESCRIPTION BLOCK ====================================
 
-define(['N/record', 'N/runtime', 'N/search'], function (
+define(["N/record", "N/runtime", "N/search"], function (
   record,
   runtime,
   search
 ) {
-  function afterSubmit (scriptContext) {
+  function afterSubmit(scriptContext) {
     try {
-      var loadSpsRecordContext = scriptContext.newRecord
-      var internalidSps = loadSpsRecordContext.id
-      var invoiceNumberArr = []
-      var checkDataObjArr = []
-      var paymentObj = {}
+      var loadSpsRecordContext = scriptContext.newRecord;
+      var internalidSps = loadSpsRecordContext.id;
+      var invoiceNumberArr = [];
+      var checkDataObjArr = [];
+      var paymentObj = {};
 
       var loadSpsRecord = record.load({
-        type: 'customtransaction_sps_cx_820_basic',
+        type: "customtransaction_sps_cx_820_basic",
         id: internalidSps
-      })
+      });
 
       var spsTradingPartnerId = loadSpsRecord.getValue({
-        fieldId: 'custbody_sps_cx_tpid'
-      })
+        fieldId: "custbody_sps_cx_tpid"
+      });
 
       var spsreferenceNum = loadSpsRecord.getValue({
-        fieldId: 'custbody_sps_cx_refnum'
-      })
+        fieldId: "custbody_sps_cx_refnum"
+      });
 
       var spsdatesps = loadSpsRecord.getValue({
-        fieldId: 'trandate'
-      })
+        fieldId: "trandate"
+      });
 
       let getLineCountSps = loadSpsRecord.getLineCount({
-        sublistId: 'line'
-      })
+        sublistId: "line"
+      });
 
       let totalTranAmt = loadSpsRecord.getValue({
-        fieldId: 'custbody_sps_cx_amount'
-      })
+        fieldId: "custbody_sps_cx_amount"
+      });
 
       let checkCreated = loadSpsRecord.getValue({
-        fieldId: 'custbody_gbs_check_created'
-      })
+        fieldId: "custbody_gbs_check_created"
+      });
 
       // log.debug('totalTranAmt', totalTranAmt)
       if (_logValidation(totalTranAmt)) {
-        totalTranAmt = Math.abs(totalTranAmt)
+        totalTranAmt = Math.abs(totalTranAmt);
       }
 
       //LOWE,TARGET, WALMART, MACY, HD
-      if (spsTradingPartnerId === 548 || spsTradingPartnerId === '548') {
+      if (spsTradingPartnerId === 548 || spsTradingPartnerId === "548") {
         //LOWE'S
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_invoicenumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          })
+          });
 
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
+            sublistId: "line",
+            fieldId: "custcol_gbs_ispaymentcreate",
             line: i
-          })
+          });
           //paymentCreateCheckbox = false
 
           if (_logValidation(invoiceNumber)) {
-            let checkInt = isNumber(invoiceNumber)
+            let checkInt = isNumber(invoiceNumber);
 
             if (checkInt == true) {
-              invoiceNumber = invoiceNumber.toString()
-              invoiceNumber = Number(invoiceNumber).toString()
+              invoiceNumber = invoiceNumber.toString();
+              invoiceNumber = Number(invoiceNumber).toString();
             }
           }
           let netPaidAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_netpaidamt',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_netpaidamt",
             line: i
-          })
+          });
 
           //CHECK DATA
           if (netPaidAmt < 0 && !paymentCreateCheckbox && netPaidAmt) {
@@ -102,14 +102,14 @@ define(['N/record', 'N/runtime', 'N/search'], function (
               memo: invoiceNumber,
               adjustAmt: netPaidAmt,
               invoiceNumber: invoiceNumber
-            })
+            });
 
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
 
           //PAYMENT DATA
@@ -118,18 +118,18 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             paymentCreateCheckbox == false &&
             netPaidAmt > 0
           ) {
-            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
-            paymentObj[invoiceNumber] = netPaidAmt
+            invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
+            paymentObj[invoiceNumber] = netPaidAmt;
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
         }
 
-        invoiceNumberArr.pop()
+        invoiceNumberArr.pop();
 
         // log.debug({
         //   title: 'invoiceNumberArr',
@@ -138,157 +138,157 @@ define(['N/record', 'N/runtime', 'N/search'], function (
 
         /***************************CREATE PAYMENT******************/
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr)
+          var searchResultInv = invoiceSearch(invoiceNumberArr);
 
           // log.debug({
           //   title: 'searchResultInv',
           //   details: searchResultInv
           // })
 
-          let invoiceResultLength = searchResultInv.length
-          let paymentLine = 0
-          let custArr = []
-          let custObj = {}
+          let invoiceResultLength = searchResultInv.length;
+          let paymentLine = 0;
+          let custArr = [];
+          let custObj = {};
 
           for (let i = 0; i < invoiceResultLength; i++) {
             let customer = searchResultInv[i].getValue({
-              name: 'entity',
-              label: 'Name'
-            })
+              name: "entity",
+              label: "Name"
+            });
 
             let tranid = searchResultInv[i].getValue({
-              name: 'tranid',
-              label: 'Document Number'
-            })
+              name: "tranid",
+              label: "Document Number"
+            });
 
             let status = searchResultInv[i].getValue({
-              name: 'statusref',
-              label: 'Status'
-            })
+              name: "statusref",
+              label: "Status"
+            });
 
             if (!custArr.includes(customer)) {
-              custArr.push(customer)
-              custObj[customer] = []
+              custArr.push(customer);
+              custObj[customer] = [];
               custObj[customer].push({
                 tranid: tranid,
                 status: status
-              })
+              });
             } else {
               custObj[customer].push({
                 tranid: tranid,
                 status: status
-              })
+              });
             }
           }
 
-          log.debug('custObj 214', custObj)
+          log.debug("custObj 214", custObj);
 
           for (const key in custObj) {
-            let paymentLine = 0
-            let arr = custObj[key]
+            let paymentLine = 0;
+            let arr = custObj[key];
             let invoiceToPayment = record.create({
-              type: 'customerpayment',
+              type: "customerpayment",
               isDynamic: true
-            })
+            });
 
             invoiceToPayment.setValue({
-              fieldId: 'customer',
+              fieldId: "customer",
               value: key
-            })
+            });
 
             invoiceToPayment.setValue({
-              fieldId: 'account',
+              fieldId: "account",
               value: 571
-            })
+            });
 
             if (_logValidation(spsdatesps)) {
               invoiceToPayment.setValue({
-                fieldId: 'trandate',
+                fieldId: "trandate",
                 value: spsdatesps
-              })
+              });
             }
 
             if (_logValidation(spsreferenceNum)) {
               invoiceToPayment.setValue({
-                fieldId: 'memo',
+                fieldId: "memo",
                 value: spsreferenceNum
-              })
+              });
             }
 
             invoiceToPayment.setValue({
-              fieldId: 'custbody_820_payment_order',
+              fieldId: "custbody_820_payment_order",
               value: internalidSps
-            })
+            });
 
             if (_logValidation(spsdatesps)) {
               invoiceToPayment.setValue({
-                fieldId: 'trandate',
+                fieldId: "trandate",
                 value: spsdatesps
-              })
+              });
             }
 
             if (_logValidation(spsreferenceNum)) {
               invoiceToPayment.setValue({
-                fieldId: 'memo',
+                fieldId: "memo",
                 value: spsreferenceNum
-              })
+              });
             }
 
             invoiceToPayment.setValue({
-              fieldId: 'custbody_820_payment_order',
+              fieldId: "custbody_820_payment_order",
               value: internalidSps
-            })
+            });
 
             for (let b = 0; b < arr.length; b++) {
-              let obj = arr[b]
+              let obj = arr[b];
 
-              if (obj.status === 'paidInFull') {
+              if (obj.status === "paidInFull") {
                 //todo array checkbox
                 //checkboxValueArr
               } else {
-                paymentLine++
+                paymentLine++;
 
                 let lineNo = invoiceToPayment.findSublistLineWithValue({
-                  sublistId: 'apply',
-                  fieldId: 'refnum',
+                  sublistId: "apply",
+                  fieldId: "refnum",
                   value: obj.tranid
-                })
+                });
 
                 lineNo =
                   lineNo === -1
                     ? invoiceToPayment.findSublistLineWithValue({
-                        sublistId: 'apply',
-                        fieldId: 'refnum',
-                        value: 'INV' + obj.tranid
+                        sublistId: "apply",
+                        fieldId: "refnum",
+                        value: "INV" + obj.tranid
                       })
-                    : lineNo
+                    : lineNo;
 
                 if (lineNo != -1) {
                   invoiceToPayment.selectLine({
-                    sublistId: 'apply',
+                    sublistId: "apply",
                     line: lineNo
-                  })
+                  });
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'apply',
+                    sublistId: "apply",
+                    fieldId: "apply",
                     value: true
-                  })
+                  });
 
                   obj.tranid = paymentObj[obj.tranid]
                     ? obj.tranid
-                    : obj.tranid.replace('INV', '')
+                    : obj.tranid.replace("INV", "");
 
                   //todo
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'amount',
+                    sublistId: "apply",
+                    fieldId: "amount",
                     value: paymentObj[obj.tranid]
-                  })
+                  });
 
                   invoiceToPayment.commitLine({
-                    sublistId: 'apply'
-                  })
+                    sublistId: "apply"
+                  });
                 }
               }
             }
@@ -297,7 +297,7 @@ define(['N/record', 'N/runtime', 'N/search'], function (
               invoiceToPayment.save({
                 enableSourcing: true,
                 ignoreMandatoryFields: true
-              })
+              });
             }
           }
         }
@@ -305,84 +305,84 @@ define(['N/record', 'N/runtime', 'N/search'], function (
         /**********************CREATE CHECK*****************/
         if (!checkCreated) {
           var createCheck = record.create({
-            type: 'check',
+            type: "check",
             isDynamic: true
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'entity',
+            fieldId: "entity",
             value: 122
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'account',
+            fieldId: "account",
             value: 571
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'custbody_820_payment_order',
+            fieldId: "custbody_820_payment_order",
             value: internalidSps
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
 
           if (_logValidation(spsreferenceNum)) {
             createCheck.setValue({
-              fieldId: 'memo',
+              fieldId: "memo",
               value: spsreferenceNum
-            })
+            });
           }
 
-          log.debug('checkDataObjArr', checkDataObjArr)
-          var checkPaymentLine = 0
+          log.debug("checkDataObjArr", checkDataObjArr);
+          var checkPaymentLine = 0;
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            checkPaymentLine++
+            checkPaymentLine++;
             createCheck.selectNewLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'account',
+              sublistId: "expense",
+              fieldId: "account",
               value: 432,
               ignoreFieldChange: true
-            })
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'memo',
+              sublistId: "expense",
+              fieldId: "memo",
               value: checkDataObjArr[j].memo
-            })
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'amount',
+              sublistId: "expense",
+              fieldId: "amount",
               value: Math.abs(checkDataObjArr[j].adjustAmt)
-            })
+            });
 
             createCheck.commitLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
           }
 
           if (checkPaymentLine) {
-            createCheck.save()
+            createCheck.save();
           }
 
           loadSpsRecord.setValue({
-            fieldId: 'custbody_gbs_check_created',
+            fieldId: "custbody_gbs_check_created",
             value: true
-          })
+          });
         }
 
         /********************CREATE JE*******************/
         let checkJE = loadSpsRecord.getValue({
-          fieldId: 'custbody_je_created'
-        })
+          fieldId: "custbody_je_created"
+        });
 
         if (checkJE === false) {
           createJE(
@@ -393,46 +393,46 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             loadSpsRecord,
             571,
             221
-          )
+          );
         }
       } else if (
         spsTradingPartnerId === 177282 ||
-        spsTradingPartnerId === '177282'
+        spsTradingPartnerId === "177282"
       ) {
         //TARGET
-        let preDiscObj = {}
+        let preDiscObj = {};
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_invoicenumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          })
+          });
           if (_logValidation(invoiceNumber)) {
-            invoiceNumber = invoiceNumber.split('-')[0]
+            invoiceNumber = invoiceNumber.split("-")[0];
           }
 
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
+            sublistId: "line",
+            fieldId: "custcol_gbs_ispaymentcreate",
             line: i
-          })
+          });
 
           let microfilm = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_microfilmnum',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_microfilmnum",
             line: i
-          })
+          });
           let adjustAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_adjamount',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_adjamount",
             line: i
-          })
+          });
 
           let netPaidAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_netpaidamt',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_netpaidamt",
             line: i
-          })
+          });
 
           //CHECK DATA
           if (adjustAmt < 0 && !paymentCreateCheckbox && adjustAmt) {
@@ -440,112 +440,112 @@ define(['N/record', 'N/runtime', 'N/search'], function (
               memo: microfilm,
               adjustAmt: adjustAmt,
               invoiceNumber: invoiceNumber
-            })
+            });
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
 
           //PAYMENT DATA
           if (!!invoiceNumber && paymentCreateCheckbox == false) {
-            invoiceNumberArr.push(['poastext', 'is', invoiceNumber], 'OR')
-            preDiscObj[invoiceNumber] = netPaidAmt
+            invoiceNumberArr.push(["poastext", "is", invoiceNumber], "OR");
+            preDiscObj[invoiceNumber] = netPaidAmt;
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
         }
-        invoiceNumberArr.pop()
+        invoiceNumberArr.pop();
         // log.debug({
         //   title: 'invoiceNumberArr',
         //   details: invoiceNumberArr
         // })
         /***************************CREATE PAYMENT************************/
         let invoiceToPayment = record.create({
-          type: 'customerpayment',
+          type: "customerpayment",
           isDynamic: true
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'customer',
+          fieldId: "customer",
           value: 546
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'account',
+          fieldId: "account",
           value: 574
-        })
+        });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
         }
         if (_logValidation(spsreferenceNum)) {
           invoiceToPayment.setValue({
-            fieldId: 'memo',
+            fieldId: "memo",
             value: spsreferenceNum
-          })
+          });
         }
         invoiceToPayment.setValue({
-          fieldId: 'custbody_820_payment_order',
+          fieldId: "custbody_820_payment_order",
           value: internalidSps
-        })
+        });
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr)
+          var searchResultInv = invoiceSearch(invoiceNumberArr);
           // log.debug({
           //   title: 'searchResultInv',
           //   details: searchResultInv
           // })
-          let invoiceResultLength = searchResultInv.length
-          let paymentLine = 0
+          let invoiceResultLength = searchResultInv.length;
+          let paymentLine = 0;
           for (let i = 0; i < invoiceResultLength; i++) {
             let tranid = searchResultInv[i].getValue({
-              name: 'tranid',
-              label: 'Document Number'
-            })
+              name: "tranid",
+              label: "Document Number"
+            });
             let poNum = searchResultInv[i].getValue({
-              name: 'otherrefnum',
-              label: 'PO/Check Number'
-            })
-            log.debug('poNum', poNum)
+              name: "otherrefnum",
+              label: "PO/Check Number"
+            });
+            log.debug("poNum", poNum);
             let status = searchResultInv[i].getValue({
-              name: 'statusref',
-              label: 'Status'
-            })
-            if (status === 'paidInFull') {
+              name: "statusref",
+              label: "Status"
+            });
+            if (status === "paidInFull") {
               //todo array checkbox
               //checkboxValueArr
             } else {
-              paymentLine++
+              paymentLine++;
               let lineNo = invoiceToPayment.findSublistLineWithValue({
-                sublistId: 'apply',
-                fieldId: 'refnum',
+                sublistId: "apply",
+                fieldId: "refnum",
                 value: tranid
-              })
-              log.debug('lineNo', lineNo)
+              });
+              log.debug("lineNo", lineNo);
               if (lineNo != -1) {
                 invoiceToPayment.selectLine({
-                  sublistId: 'apply',
+                  sublistId: "apply",
                   line: lineNo
-                })
+                });
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'apply',
+                  sublistId: "apply",
+                  fieldId: "apply",
                   value: true
-                })
+                });
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'amount',
+                  sublistId: "apply",
+                  fieldId: "amount",
                   value: preDiscObj[poNum]
-                })
+                });
                 invoiceToPayment.commitLine({
-                  sublistId: 'apply'
-                })
+                  sublistId: "apply"
+                });
               }
             }
           }
@@ -554,80 +554,80 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             invoiceToPayment.save({
               enableSourcing: true,
               ignoreMandatoryFields: true
-            })
+            });
           }
         }
 
         /**********************CREATE CHECK*****************/
         if (!checkCreated) {
           var createCheck = record.create({
-            type: 'check',
+            type: "check",
             isDynamic: true
-          })
+          });
           createCheck.setValue({
-            fieldId: 'entity',
+            fieldId: "entity",
             value: 546
-          })
+          });
           createCheck.setValue({
-            fieldId: 'account',
+            fieldId: "account",
             value: 574
-          })
+          });
           createCheck.setValue({
-            fieldId: 'custbody_820_payment_order',
+            fieldId: "custbody_820_payment_order",
             value: internalidSps
-          })
+          });
           createCheck.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
           if (_logValidation(spsreferenceNum)) {
             createCheck.setValue({
-              fieldId: 'memo',
+              fieldId: "memo",
               value: spsreferenceNum
-            })
+            });
           }
-          var checkPaymentLine = 0
+          var checkPaymentLine = 0;
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            checkPaymentLine++
+            checkPaymentLine++;
             createCheck.selectNewLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'account',
+              sublistId: "expense",
+              fieldId: "account",
               value: 434,
               ignoreFieldChange: true
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'memo',
+              sublistId: "expense",
+              fieldId: "memo",
               value: checkDataObjArr[j].memo
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'amount',
+              sublistId: "expense",
+              fieldId: "amount",
               value: Math.abs(checkDataObjArr[j].adjustAmt)
-            })
+            });
             createCheck.commitLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
           }
 
           if (checkPaymentLine) {
-            createCheck.save()
+            createCheck.save();
           }
 
           loadSpsRecord.setValue({
-            fieldId: 'custbody_gbs_check_created',
+            fieldId: "custbody_gbs_check_created",
             value: true
-          })
+          });
         }
 
         /********************CREATE JE*******************/
         let checkJE = loadSpsRecord.getValue({
-          fieldId: 'custbody_je_created'
-        })
+          fieldId: "custbody_je_created"
+        });
 
         if (checkJE === false) {
           createJE(
@@ -638,62 +638,62 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             loadSpsRecord,
             574,
             221
-          )
+          );
         }
-      } else if (spsTradingPartnerId === 540 || spsTradingPartnerId === '540') {
+      } else if (spsTradingPartnerId === 540 || spsTradingPartnerId === "540") {
         //WALMART
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_invoicenumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          })
+          });
 
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
+            sublistId: "line",
+            fieldId: "custcol_gbs_ispaymentcreate",
             line: i
-          })
-          paymentCreateCheckbox = false
+          });
+          paymentCreateCheckbox = false;
 
           if (_logValidation(invoiceNumber)) {
-            let checkInt = isNumber(invoiceNumber)
+            let checkInt = isNumber(invoiceNumber);
 
             if (checkInt == true) {
-              invoiceNumber = invoiceNumber.toString()
-              invoiceNumber = Number(invoiceNumber).toString()
+              invoiceNumber = invoiceNumber.toString();
+              invoiceNumber = Number(invoiceNumber).toString();
             }
           }
 
           let adjustAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_adjamount',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_adjamount",
             line: i
-          })
+          });
 
           let remittanceDisc = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_disc_amounttaken',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_disc_amounttaken",
             line: i
-          })
+          });
 
           let netPaidAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_netpaidamt',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_netpaidamt",
             line: i
-          })
+          });
 
           let microfilm = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_microfilmnum',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_microfilmnum",
             line: i
-          })
+          });
 
           let purchaseOrNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_purchaseordernumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_purchaseordernumber",
             line: i
-          })
+          });
 
           //CHECK DATA
           if (
@@ -702,38 +702,37 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             (adjustAmt || netPaidAmt) &&
             !purchaseOrNumber
           ) {
-            
             checkDataObjArr.push({
               memo: microfilm,
               adjustAmt: adjustAmt || netPaidAmt,
               invoiceNumber: invoiceNumber
-            })
+            });
 
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
 
           //PAYMENT DATA
           if (!!invoiceNumber && paymentCreateCheckbox == false) {
-            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
+            invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
             paymentObj[invoiceNumber] = {
               netPaidAmt: netPaidAmt,
               remittanceDisc: remittanceDisc + Math.abs(adjustAmt)
-            }
+            };
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
         }
 
-        invoiceNumberArr.pop()
+        invoiceNumberArr.pop();
 
         // log.debug({
         //   title: 'invoiceNumberArr',
@@ -742,148 +741,148 @@ define(['N/record', 'N/runtime', 'N/search'], function (
 
         /***************************CREATE PAYMENT************************/
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr)
+          var searchResultInv = invoiceSearch(invoiceNumberArr);
 
           // log.debug({
           //   title: 'searchResultInv',
           //   details: searchResultInv
           // })
 
-          let invoiceResultLength = searchResultInv.length
+          let invoiceResultLength = searchResultInv.length;
 
-          let custArr = []
-          let custObj = {}
+          let custArr = [];
+          let custObj = {};
 
           for (let i = 0; i < invoiceResultLength; i++) {
             let customer = searchResultInv[i].getValue({
-              name: 'entity',
-              label: 'Name'
-            })
+              name: "entity",
+              label: "Name"
+            });
 
             let tranid = searchResultInv[i].getValue({
-              name: 'tranid',
-              label: 'Document Number'
-            })
+              name: "tranid",
+              label: "Document Number"
+            });
 
             let status = searchResultInv[i].getValue({
-              name: 'statusref',
-              label: 'Status'
-            })
+              name: "statusref",
+              label: "Status"
+            });
 
             if (!custArr.includes(customer)) {
-              custArr.push(customer)
-              custObj[customer] = []
+              custArr.push(customer);
+              custObj[customer] = [];
               custObj[customer].push({
                 tranid: tranid,
                 status: status
-              })
+              });
             } else {
               custObj[customer].push({
                 tranid: tranid,
                 status: status
-              })
+              });
             }
           }
 
-          log.debug('custObj 195', custObj)
-          log.debug('paymentObj 195', paymentObj)
+          log.debug("custObj 195", custObj);
+          log.debug("paymentObj 195", paymentObj);
 
           for (const key in custObj) {
-            let paymentLine = 0
-            let arr = custObj[key]
+            let paymentLine = 0;
+            let arr = custObj[key];
 
             var invoiceToPayment = record.create({
-              type: 'customerpayment',
+              type: "customerpayment",
               isDynamic: true
-            })
+            });
 
             invoiceToPayment.setValue({
-              fieldId: 'customer',
+              fieldId: "customer",
               value: key
-            })
+            });
 
             invoiceToPayment.setValue({
-              fieldId: 'account',
+              fieldId: "account",
               value: 573
-            })
+            });
 
             if (_logValidation(spsdatesps)) {
               invoiceToPayment.setValue({
-                fieldId: 'trandate',
+                fieldId: "trandate",
                 value: spsdatesps
-              })
+              });
             }
 
             if (_logValidation(spsreferenceNum)) {
               invoiceToPayment.setValue({
-                fieldId: 'memo',
+                fieldId: "memo",
                 value: spsreferenceNum
-              })
+              });
             }
 
             invoiceToPayment.setValue({
-              fieldId: 'custbody_820_payment_order',
+              fieldId: "custbody_820_payment_order",
               value: internalidSps
-            })
+            });
 
             if (_logValidation(spsdatesps)) {
               invoiceToPayment.setValue({
-                fieldId: 'trandate',
+                fieldId: "trandate",
                 value: spsdatesps
-              })
+              });
             }
 
             if (_logValidation(spsreferenceNum)) {
               invoiceToPayment.setValue({
-                fieldId: 'memo',
+                fieldId: "memo",
                 value: spsreferenceNum
-              })
+              });
             }
 
             invoiceToPayment.setValue({
-              fieldId: 'custbody_820_payment_order',
+              fieldId: "custbody_820_payment_order",
               value: internalidSps
-            })
+            });
 
             for (let b = 0; b < arr.length; b++) {
-              let obj = arr[b]
+              let obj = arr[b];
 
               //log.debug('obj 847', obj)
 
-              if (obj.status === 'paidInFull') {
+              if (obj.status === "paidInFull") {
                 //todo array checkbox
                 //checkboxValueArr
               } else {
                 let lineNo = invoiceToPayment.findSublistLineWithValue({
-                  sublistId: 'apply',
-                  fieldId: 'refnum',
+                  sublistId: "apply",
+                  fieldId: "refnum",
                   value: obj.tranid
-                })
+                });
 
                 lineNo =
                   lineNo === -1
                     ? invoiceToPayment.findSublistLineWithValue({
-                        sublistId: 'apply',
-                        fieldId: 'refnum',
-                        value: 'INV' + obj.tranid
+                        sublistId: "apply",
+                        fieldId: "refnum",
+                        value: "INV" + obj.tranid
                       })
-                    : lineNo
+                    : lineNo;
 
-                log.debug('lineNo', lineNo)
-                log.debug('obj.tranid', obj.tranid)
+                log.debug("lineNo", lineNo);
+                log.debug("obj.tranid", obj.tranid);
 
                 if (lineNo != -1) {
-                  paymentLine++
+                  paymentLine++;
                   invoiceToPayment.selectLine({
-                    sublistId: 'apply',
+                    sublistId: "apply",
                     line: lineNo
-                  })
+                  });
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'apply',
+                    sublistId: "apply",
+                    fieldId: "apply",
                     value: true
-                  })
+                  });
 
                   //log.debug('lineNo', lineNo)
                   // obj.tranid = paymentObj[obj.tranid]
@@ -893,38 +892,38 @@ define(['N/record', 'N/runtime', 'N/search'], function (
                   //todo
                   try {
                     log.debug(
-                      'paymentObj[obj.tranid].remittanceDisc',
+                      "paymentObj[obj.tranid].remittanceDisc",
                       paymentObj[obj.tranid].remittanceDisc
-                    )
+                    );
                   } catch (error) {
-                    obj.tranid = obj.tranid.substring(3)
+                    obj.tranid = obj.tranid.substring(3);
                   }
 
                   log.debug(
-                    'paymentObj[obj.tranid].remittanceDisc',
+                    "paymentObj[obj.tranid].remittanceDisc",
                     paymentObj[obj.tranid].remittanceDisc
-                  )
+                  );
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'disc',
+                    sublistId: "apply",
+                    fieldId: "disc",
                     value: paymentObj[obj.tranid].remittanceDisc
-                  })
+                  });
 
                   log.debug(
-                    'paymentObj[obj.tranid].netPaidAmt',
+                    "paymentObj[obj.tranid].netPaidAmt",
                     paymentObj[obj.tranid].netPaidAmt
-                  )
+                  );
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'amount',
+                    sublistId: "apply",
+                    fieldId: "amount",
                     value: Math.abs(paymentObj[obj.tranid].netPaidAmt)
-                  })
+                  });
 
                   invoiceToPayment.commitLine({
-                    sublistId: 'apply'
-                  })
+                    sublistId: "apply"
+                  });
                 }
               }
             }
@@ -933,95 +932,98 @@ define(['N/record', 'N/runtime', 'N/search'], function (
               invoiceToPayment.save({
                 enableSourcing: true,
                 ignoreMandatoryFields: true
-              })
+              });
             }
           }
         }
 
-        var checkPaymentLine = 0
+        var checkPaymentLine = 0;
 
         /**********************CREATE CHECK*****************/
         if (!checkCreated) {
           var createCheck = record.create({
-            type: 'check',
+            type: "check",
             isDynamic: true
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'entity',
+            fieldId: "entity",
             value: 540
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'account',
+            fieldId: "account",
             value: 573
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'custbody_820_payment_order',
+            fieldId: "custbody_820_payment_order",
             value: internalidSps
-          })
+          });
 
           createCheck.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
 
           if (_logValidation(spsreferenceNum)) {
             createCheck.setValue({
-              fieldId: 'memo',
+              fieldId: "memo",
               value: spsreferenceNum
-            })
+            });
           }
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            checkPaymentLine++
+            checkPaymentLine++;
             createCheck.selectNewLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'account',
+              sublistId: "expense",
+              fieldId: "account",
               value: 435,
               ignoreFieldChange: true
-            })
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'memo',
+              sublistId: "expense",
+              fieldId: "memo",
               value: checkDataObjArr[j].memo
-            })
+            });
 
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'amount',
+              sublistId: "expense",
+              fieldId: "amount",
               value: checkDataObjArr[j].adjustAmt
-            })
+            });
 
             createCheck.commitLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
           }
 
-          if (checkPaymentLine) { 
+          if (checkPaymentLine) {
             try {
-              createCheck.save()
+              createCheck.save();
             } catch (error) {
-              log.debug('Negative amount encountered on check for walmart', error);
+              log.debug(
+                "Negative amount encountered on check for walmart",
+                error
+              );
             }
           }
 
           loadSpsRecord.setValue({
-            fieldId: 'custbody_gbs_check_created',
+            fieldId: "custbody_gbs_check_created",
             value: true
-          })
+          });
         }
 
         /********************CREATE JE*******************/
         let checkJE = loadSpsRecord.getValue({
-          fieldId: 'custbody_je_created'
-        })
+          fieldId: "custbody_je_created"
+        });
 
         if (checkJE === false) {
           createJE(
@@ -1032,178 +1034,177 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             loadSpsRecord,
             573,
             450,
-            'walmart'
-          )
+            "walmart"
+          );
         }
-        
-      } else if (spsTradingPartnerId === 537 || spsTradingPartnerId === '537') {
+      } else if (spsTradingPartnerId === 537 || spsTradingPartnerId === "537") {
         //MACY
-        let preDiscObj = {}
+        let preDiscObj = {};
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_invoicenumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          })
+          });
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
+            sublistId: "line",
+            fieldId: "custcol_gbs_ispaymentcreate",
             line: i
-          })
+          });
           if (_logValidation(invoiceNumber)) {
-            let checkInt = isNumber(invoiceNumber)
+            let checkInt = isNumber(invoiceNumber);
             if (checkInt == true) {
-              invoiceNumber = invoiceNumber.toString()
-              invoiceNumber = Number(invoiceNumber).toString()
+              invoiceNumber = invoiceNumber.toString();
+              invoiceNumber = Number(invoiceNumber).toString();
             }
           }
           let memo = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'memo',
+            sublistId: "line",
+            fieldId: "memo",
             line: i
-          })
+          });
           let adjustAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_adjamount',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_adjamount",
             line: i
-          })
+          });
           let adjustAmtCode = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_adjreason',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_adjreason",
             line: i
-          })
+          });
           //CHECK DATA
           if (
             adjustAmt < 0 &&
             !paymentCreateCheckbox &&
             adjustAmt &&
-            adjustAmtCode === 'ZZ'
+            adjustAmtCode === "ZZ"
           ) {
             checkDataObjArr.push({
               memo: memo,
               adjustAmt: adjustAmt,
               invoiceNumber: invoiceNumber
-            })
+            });
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
 
           let preDiscAmt =
             loadSpsRecord.getSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_sps_cx_originalamt',
+              sublistId: "line",
+              fieldId: "custcol_sps_cx_originalamt",
               line: i
-            }) || 0
+            }) || 0;
           //PAYMENT DATA
           if (
             !(preDiscAmt > 0 && !invoiceNumber) &&
             paymentCreateCheckbox == false &&
             preDiscAmt
           ) {
-            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
+            invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
             preDiscObj[invoiceNumber] = {
               preDiscAmt: preDiscAmt * 0.02,
               payment: preDiscAmt - preDiscAmt * 0.02
-            }
+            };
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
         }
-        invoiceNumberArr.pop()
+        invoiceNumberArr.pop();
         // log.debug({
         //   title: 'invoiceNumberArr',
         //   details: invoiceNumberArr
         // })
         /***************************CREATE PAYMENT************************/
         let invoiceToPayment = record.create({
-          type: 'customerpayment',
+          type: "customerpayment",
           isDynamic: true
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'customer',
+          fieldId: "customer",
           value: 537
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'account',
+          fieldId: "account",
           value: 575
-        })
+        });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
         }
         if (_logValidation(spsreferenceNum)) {
           invoiceToPayment.setValue({
-            fieldId: 'memo',
+            fieldId: "memo",
             value: spsreferenceNum
-          })
+          });
         }
         invoiceToPayment.setValue({
-          fieldId: 'custbody_820_payment_order',
+          fieldId: "custbody_820_payment_order",
           value: internalidSps
-        })
+        });
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr)
+          var searchResultInv = invoiceSearch(invoiceNumberArr);
           // log.debug({
           //   title: 'searchResultInv',
           //   details: searchResultInv
           // })
-          let invoiceResultLength = searchResultInv.length
-          let paymentLine = 0
+          let invoiceResultLength = searchResultInv.length;
+          let paymentLine = 0;
           for (let i = 0; i < invoiceResultLength; i++) {
             let tranid = searchResultInv[i].getValue({
-              name: 'tranid',
-              label: 'Document Number'
-            })
+              name: "tranid",
+              label: "Document Number"
+            });
             let status = searchResultInv[i].getValue({
-              name: 'statusref',
-              label: 'Status'
-            })
-            if (status === 'paidInFull') {
+              name: "statusref",
+              label: "Status"
+            });
+            if (status === "paidInFull") {
               //todo array checkbox
               //checkboxValueArr
             } else {
-              paymentLine++
+              paymentLine++;
               let lineNo = invoiceToPayment.findSublistLineWithValue({
-                sublistId: 'apply',
-                fieldId: 'refnum',
+                sublistId: "apply",
+                fieldId: "refnum",
                 value: tranid
-              })
+              });
               if (lineNo != -1) {
                 invoiceToPayment.selectLine({
-                  sublistId: 'apply',
+                  sublistId: "apply",
                   line: lineNo
-                })
+                });
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'apply',
+                  sublistId: "apply",
+                  fieldId: "apply",
                   value: true
-                })
+                });
 
-                tranid = tranid.replace('INV', '')
+                tranid = tranid.replace("INV", "");
 
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'amount',
+                  sublistId: "apply",
+                  fieldId: "amount",
                   value: preDiscObj[tranid].payment
-                })
+                });
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'disc',
+                  sublistId: "apply",
+                  fieldId: "disc",
                   value: preDiscObj[tranid].preDiscAmt
-                })
+                });
                 invoiceToPayment.commitLine({
-                  sublistId: 'apply'
-                })
+                  sublistId: "apply"
+                });
               }
             }
           }
@@ -1212,83 +1213,83 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             invoiceToPayment.save({
               enableSourcing: true,
               ignoreMandatoryFields: true
-            })
+            });
           }
         }
 
         /**********************CREATE CHECK*****************/
         if (!checkCreated) {
           var createCheck = record.create({
-            type: 'check',
+            type: "check",
             isDynamic: true
-          })
+          });
           createCheck.setValue({
-            fieldId: 'entity',
+            fieldId: "entity",
             value: 537
-          })
+          });
           createCheck.setValue({
-            fieldId: 'account',
+            fieldId: "account",
             value: 575
-          })
+          });
           createCheck.setValue({
-            fieldId: 'custbody_820_payment_order',
+            fieldId: "custbody_820_payment_order",
             value: internalidSps
-          })
+          });
           createCheck.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
 
           if (_logValidation(spsreferenceNum)) {
             createCheck.setValue({
-              fieldId: 'memo',
+              fieldId: "memo",
               value: spsreferenceNum
-            })
+            });
           }
 
-          var checkPaymentLine = 0
+          var checkPaymentLine = 0;
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            checkPaymentLine++
+            checkPaymentLine++;
             createCheck.selectNewLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'account',
+              sublistId: "expense",
+              fieldId: "account",
               //value: 355,
               value: 578,
               ignoreFieldChange: true
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'memo',
+              sublistId: "expense",
+              fieldId: "memo",
               value: checkDataObjArr[j].memo
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'amount',
+              sublistId: "expense",
+              fieldId: "amount",
               value: Math.abs(checkDataObjArr[j].adjustAmt)
-            })
+            });
             createCheck.commitLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
           }
 
           if (checkPaymentLine) {
-            createCheck.save()
+            createCheck.save();
           }
 
           loadSpsRecord.setValue({
-            fieldId: 'custbody_gbs_check_created',
+            fieldId: "custbody_gbs_check_created",
             value: true
-          })
+          });
         }
 
         /********************CREATE JE*******************/
         let checkJE = loadSpsRecord.getValue({
-          fieldId: 'custbody_je_created'
-        })
+          fieldId: "custbody_je_created"
+        });
         if (checkJE === false) {
           createJE(
             spsdatesps,
@@ -1298,236 +1299,273 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             loadSpsRecord,
             575,
             221
-          )
+          );
         }
-      } else if (spsTradingPartnerId === 119 || spsTradingPartnerId === '119') {
+      } else if (spsTradingPartnerId === 119 || spsTradingPartnerId === "119") {
         //HOME DEPOT
-        let preDiscObj = {}
+        let preDiscObj = {};
         for (let i = 0; i < getLineCountSps; i++) {
           let invoiceNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_invoicenumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          })
+          });
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_gbs_ispaymentcreate',
+            sublistId: "line",
+            fieldId: "custcol_gbs_ispaymentcreate",
             line: i
-          })
+          });
+          //!!change this before mvoing to prod
           paymentCreateCheckbox = false;
 
           if (_logValidation(invoiceNumber)) {
-            let checkInt = isNumber(invoiceNumber)
+            let checkInt = isNumber(invoiceNumber);
             if (checkInt == true) {
-              invoiceNumber = invoiceNumber.toString()
-              invoiceNumber = Number(invoiceNumber).toString()
+              invoiceNumber = invoiceNumber.toString();
+              invoiceNumber = Number(invoiceNumber).toString();
             }
           }
           let remittanceDisc = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_disc_amounttaken',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_disc_amounttaken",
             line: i
-          })
-          remittanceDisc =  remittanceDisc ? Number(remittanceDisc) : remittanceDisc;
+          });
+          remittanceDisc = remittanceDisc ? Number(remittanceDisc) : 0;
 
           let adjustAmt = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_adjamount',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_adjamount",
             line: i
-          })
-          adjustAmt =  adjustAmt ? Number(adjustAmt) : adjustAmt;
-
+          });
+          adjustAmt = adjustAmt ? Number(adjustAmt) : 0;
 
           let purchaseOrNumber = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_purchaseordernumber',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_purchaseordernumber",
             line: i
-          })
+          });
           if (purchaseOrNumber) {
             // purchaseOrNumber = Number(purchaseOrNumber).toString()
-            purchaseOrNumber = parseInt(purchaseOrNumber)
+            purchaseOrNumber = parseInt(purchaseOrNumber);
             //  purchaseOrNumber = (purchaseOrNumber * 1).toString();
           }
 
           let microfilm = loadSpsRecord.getSublistValue({
-            sublistId: 'line',
-            fieldId: 'custcol_sps_cx_microfilmnum',
+            sublistId: "line",
+            fieldId: "custcol_sps_cx_microfilmnum",
             line: i
-          })
+          });
 
           //CHECK DATA
           if (
             adjustAmt < 0 &&
             !paymentCreateCheckbox &&
             adjustAmt &&
-            (!purchaseOrNumber || purchaseOrNumber === 'NOT REQU')
+            (!purchaseOrNumber || purchaseOrNumber === "NOT REQU")
           ) {
             checkDataObjArr.push({
               memo: microfilm,
               adjustAmt: adjustAmt,
               invoiceNumber: invoiceNumber,
-              microfilm: microfilm
-            })
-
-            loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
-              line: i,
-              value: true
-            })
+              microfilm: microfilm,
+              i:i
+            });
           }
 
           //PAYMENT DATA
           let preDiscAmt =
             loadSpsRecord.getSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_sps_cx_originalamt',
+              sublistId: "line",
+              fieldId: "custcol_sps_cx_originalamt",
               line: i
             }) || 0;
-          preDiscAmt =  preDiscAmt ? Number(preDiscAmt) : preDiscAmt;
+          preDiscAmt = preDiscAmt ? Number(preDiscAmt) : preDiscAmt;
 
           if (!!purchaseOrNumber && paymentCreateCheckbox == false) {
-            invoiceNumberArr.push(['numbertext', 'is', invoiceNumber], 'OR')
+            invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
 
             //only will work for two amounts in any form
             if (preDiscObj[purchaseOrNumber]) {
-              let obj = preDiscObj[purchaseOrNumber]
-              log.debug('obj b', obj)
-              obj.disc = obj.adjustAmt
-                ? remittanceDisc - obj.adjustAmt
-                : obj.remittanceDisc - adjustAmt
-              obj.payment = obj.adjustAmt
-                ? preDiscAmt - remittanceDisc + obj.adjustAmt 
-                : obj.preDiscAmt - obj.remittanceDisc + adjustAmt
-                log.debug('obj a', obj)
-              preDiscObj[purchaseOrNumber] = obj
+              //(purchaseOrNumber === '31586201') ? log.debug('purchaseOrNumber', preDiscObj[purchaseOrNumber]) : '';
+              purchaseOrNumber == "31586201" || purchaseOrNumber === 31586201
+                ? log.debug(
+                    `b ${purchaseOrNumber}`,
+                    preDiscObj[purchaseOrNumber]
+                  )
+                : "";
+
+              let objectx = preDiscObj[purchaseOrNumber];
+              //log.audit("objectx b", objectx);
+              objectx.disc = objectx.adjustAmt
+                ? remittanceDisc - objectx.adjustAmt
+                : objectx.remittanceDisc - adjustAmt;
+              objectx.payment = objectx.adjustAmt
+                ? preDiscAmt - remittanceDisc + objectx.adjustAmt
+                : objectx.preDiscAmt - objectx.remittanceDisc + adjustAmt;
+              preDiscObj[purchaseOrNumber].paymentline.push(i);
+              //log.audit("objectx a", objectx);
+              preDiscObj[purchaseOrNumber] = objectx;
+              purchaseOrNumber == "31586201" || purchaseOrNumber === 31586201
+                ? log.debug(
+                    `b ${purchaseOrNumber}`,
+                    preDiscObj[purchaseOrNumber]
+                  )
+                : "";
             } else {
               preDiscObj[purchaseOrNumber] = {
                 remittanceDisc: remittanceDisc,
                 adjustAmt: adjustAmt,
                 preDiscAmt: preDiscAmt,
                 payment: preDiscAmt - remittanceDisc + adjustAmt
-              }
+              };
+              preDiscObj[purchaseOrNumber].paymentline = [];
+              preDiscObj[purchaseOrNumber].paymentline.push(i);
             }
 
             loadSpsRecord.setSublistValue({
-              sublistId: 'line',
-              fieldId: 'custcol_gbs_ispaymentcreate',
+              sublistId: "line",
+              fieldId: "custcol_gbs_ispaymentcreate",
               line: i,
               value: true
-            })
+            });
           }
         }
-        invoiceNumberArr.pop()
-        log.debug('preDiscObj', preDiscObj)
+        invoiceNumberArr.pop();
+        log.debug("preDiscObj", preDiscObj);
         // log.debug({
         //   title: 'invoiceNumberArr',
         //   details: invoiceNumberArr
         // })
-        
+
         /***************************CREATE PAYMENT************************/
         let invoiceToPayment = record.create({
-          type: 'customerpayment',
+          type: "customerpayment",
           isDynamic: true
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'customer',
+          fieldId: "customer",
           value: 119
-        })
+        });
         invoiceToPayment.setValue({
-          fieldId: 'account',
+          fieldId: "account",
           value: 572
-        })
+        });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
         }
         if (_logValidation(spsreferenceNum)) {
           invoiceToPayment.setValue({
-            fieldId: 'memo',
+            fieldId: "memo",
             value: spsreferenceNum
-          })
+          });
         }
 
         invoiceToPayment.setValue({
-          fieldId: 'custbody_820_payment_order',
+          fieldId: "custbody_820_payment_order",
           value: internalidSps
-        })
+        });
 
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr)
+          var searchResultInv = invoiceSearch(invoiceNumberArr);
           // log.debug({
           //   title: 'searchResultInv',
           //   details: searchResultInv
           // })
-          let invoiceResultLength = searchResultInv.length
-          let paymentLine = 0
+          let invoiceResultLength = searchResultInv.length;
+          let paymentLine = 0;
           for (let i = 0; i < invoiceResultLength; i++) {
             let tranid = searchResultInv[i].getValue({
-              name: 'tranid',
-              label: 'Document Number'
-            })
+              name: "tranid",
+              label: "Document Number"
+            });
             let status = searchResultInv[i].getValue({
-              name: 'statusref',
-              label: 'Status'
-            })
+              name: "statusref",
+              label: "Status"
+            });
             let poNum = searchResultInv[i].getValue({
-              name: 'otherrefnum',
-              label: 'PO/Check Number'
-            })
-            poNum = poNum ? parseInt(poNum) : ''
+              name: "otherrefnum",
+              label: "PO/Check Number"
+            });
+            poNum = poNum ? parseInt(poNum) : tranid;
+            log.debug("poNum", poNum);
 
-            log.debug('poNum', poNum)
-            if (status === 'paidInFull') {
+            if (status === "paidInFull") {
               //todo array checkbox
               //checkboxValueArr
             } else {
-              paymentLine++
+              paymentLine++;
               let lineNo = invoiceToPayment.findSublistLineWithValue({
-                sublistId: 'apply',
-                fieldId: 'refnum',
+                sublistId: "apply",
+                fieldId: "refnum",
                 value: tranid
-              })
-              log.debug('lineNo', lineNo)
+              });
+
+              lineNo =
+                lineNo === -1
+                  ? invoiceToPayment.findSublistLineWithValue({
+                      sublistId: "apply",
+                      fieldId: "refnum",
+                      value: "INV" + tranid
+                    })
+                  : lineNo;
+
+              log.debug("lineNo", lineNo);
+
               if (lineNo != -1) {
                 invoiceToPayment.selectLine({
-                  sublistId: 'apply',
+                  sublistId: "apply",
                   line: lineNo
-                })
+                });
                 invoiceToPayment.setCurrentSublistValue({
-                  sublistId: 'apply',
-                  fieldId: 'apply',
+                  sublistId: "apply",
+                  fieldId: "apply",
                   value: true
-                })
+                });
 
                 if (preDiscObj[poNum]) {
-                  log.debug(
-                    'preDiscObj[poNum].payment',
-                    preDiscObj[poNum].payment
-                  )
+                  // log.debug(
+                  //   'preDiscObj[poNum].payment',
+                  //   preDiscObj[poNum].payment
+                  // )
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'amount',
+                    sublistId: "apply",
+                    fieldId: "amount",
                     value: preDiscObj[poNum].payment
-                  })
+                  });
 
-                  log.debug(
-                    'preDiscObj[poNum].preDiscAmt',
-                    preDiscObj[poNum].preDiscAmt
-                  )
+                  log.debug("preDiscObj[poNum].disc", preDiscObj[poNum].disc);
 
                   invoiceToPayment.setCurrentSublistValue({
-                    sublistId: 'apply',
-                    fieldId: 'disc',
-                    value: preDiscObj[poNum].disc || preDiscObj[poNum].preDiscAmt
-                  })
+                    sublistId: "apply",
+                    fieldId: "disc",
+                    value:
+                      preDiscObj[poNum].disc || preDiscObj[poNum].preDiscAmt
+                  });
+
+                  log.debug(
+                    poNum,
+                    invoiceToPayment.getCurrentSublistValue({
+                      sublistId: "apply",
+                      fieldId: "disc"
+                    })
+                  );
 
                   invoiceToPayment.commitLine({
-                    sublistId: 'apply'
-                  })
+                    sublistId: "apply"
+                  });
+                }
+
+                for (let h = 0; h < preDiscObj[poNum].paymentline.length; h++) {
+                  loadSpsRecord.setSublistValue({
+                    sublistId: "line",
+                    fieldId: "custcol_gbs_ispaymentcreate",
+                    line: preDiscObj[poNum].paymentline[h],
+                    value: true
+                  });
                 }
               }
             }
@@ -1537,80 +1575,90 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             invoiceToPayment.save({
               enableSourcing: true,
               ignoreMandatoryFields: true
-            })
+            });
           }
         }
         /**********************CREATE CHECK*****************/
         if (!checkCreated) {
           var createCheck = record.create({
-            type: 'check',
+            type: "check",
             isDynamic: true
-          })
+          });
           createCheck.setValue({
-            fieldId: 'entity',
+            fieldId: "entity",
             value: 119
-          })
+          });
           createCheck.setValue({
-            fieldId: 'account',
+            fieldId: "account",
             value: 572
-          })
+          });
           createCheck.setValue({
-            fieldId: 'custbody_820_payment_order',
+            fieldId: "custbody_820_payment_order",
             value: internalidSps
-          })
+          });
           createCheck.setValue({
-            fieldId: 'trandate',
+            fieldId: "trandate",
             value: spsdatesps
-          })
+          });
 
           if (_logValidation(spsreferenceNum)) {
             createCheck.setValue({
-              fieldId: 'memo',
+              fieldId: "memo",
               value: spsreferenceNum
-            })
+            });
           }
 
-          var checkPaymentLine = 0
+          var checkPaymentLine = 0;
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            checkPaymentLine++
+            
+            checkPaymentLine++;
             createCheck.selectNewLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'account',
+              sublistId: "expense",
+              fieldId: "account",
               value: 431,
               ignoreFieldChange: true
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'memo',
+              sublistId: "expense",
+              fieldId: "memo",
               value: checkDataObjArr[j].memo
-            })
+            });
             createCheck.setCurrentSublistValue({
-              sublistId: 'expense',
-              fieldId: 'amount',
+              sublistId: "expense",
+              fieldId: "amount",
               value: Math.abs(checkDataObjArr[j].adjustAmt)
-            })
+            });
             createCheck.commitLine({
-              sublistId: 'expense'
-            })
+              sublistId: "expense"
+            });
+
+            loadSpsRecord.setSublistValue({
+              sublistId: "line",
+              fieldId: "custcol_gbs_is_check_created",
+              line: checkDataObjArr[j].i,
+              value: true
+            });
+
           }
 
           if (checkPaymentLine) {
-            createCheck.save()
+            createCheck.save();
           }
 
           loadSpsRecord.setValue({
-            fieldId: 'custbody_gbs_check_created',
+            fieldId: "custbody_gbs_check_created",
             value: true
-          })
+          });
         }
+
         /********************CREATE JE*******************/
         let checkJE = loadSpsRecord.getValue({
-          fieldId: 'custbody_je_created'
-        })
+          fieldId: "custbody_je_created"
+        });
         if (checkJE === false) {
           createJE(
             spsdatesps,
@@ -1620,22 +1668,22 @@ define(['N/record', 'N/runtime', 'N/search'], function (
             loadSpsRecord,
             572,
             221
-          )
+          );
         }
       }
 
-      loadSpsRecord.setValue('transtatus', 'B')
+      loadSpsRecord.setValue("transtatus", "B");
 
-      loadSpsRecord.save()
+      loadSpsRecord.save();
     } catch (e) {
       log.debug({
-        title: 'e',
+        title: "e",
         details: e
-      })
+      });
     }
   }
 
-  function createJE (
+  function createJE(
     spsdatesps,
     internalidSps,
     spsreferenceNum,
@@ -1646,90 +1694,90 @@ define(['N/record', 'N/runtime', 'N/search'], function (
     cust
   ) {
     let createJE = record.create({
-      type: 'journalentry'
-    })
+      type: "journalentry"
+    });
 
     if (_logValidation(spsdatesps)) {
       createJE.setValue({
-        fieldId: 'trandate',
+        fieldId: "trandate",
         value: spsdatesps
-      })
+      });
     }
     createJE.setValue({
-      fieldId: 'subsidiary',
+      fieldId: "subsidiary",
       value: 2 //jeSubsidiary
-    })
+    });
 
     createJE.setValue({
-      fieldId: 'custbody_820_payment_order',
+      fieldId: "custbody_820_payment_order",
       value: internalidSps
-    })
+    });
 
     if (_logValidation(spsreferenceNum)) {
       createJE.setValue({
-        fieldId: 'memo',
+        fieldId: "memo",
         value: spsreferenceNum
-      })
+      });
     }
 
     createJE.setSublistValue({
-      sublistId: 'line',
-      fieldId: 'account',
+      sublistId: "line",
+      fieldId: "account",
       value: line1Acc,
       line: 0
-    })
+    });
 
     createJE.setSublistValue({
-      sublistId: 'line',
-      fieldId: 'credit',
+      sublistId: "line",
+      fieldId: "credit",
       value: totalTranAmt,
       line: 0
-    })
+    });
 
     if (_logValidation(spsreferenceNum)) {
       createJE.setSublistValue({
-        sublistId: 'line',
-        fieldId: 'memo',
+        sublistId: "line",
+        fieldId: "memo",
         value: spsreferenceNum,
         line: 0
-      })
+      });
     }
 
     createJE.setSublistValue({
-      sublistId: 'line',
-      fieldId: 'account',
+      sublistId: "line",
+      fieldId: "account",
       value: line2Acc,
       line: 1
-    })
+    });
 
     createJE.setSublistValue({
-      sublistId: 'line',
-      fieldId: 'debit',
+      sublistId: "line",
+      fieldId: "debit",
       value: totalTranAmt,
       line: 1
-    })
+    });
 
     if (_logValidation(spsreferenceNum)) {
       createJE.setSublistValue({
-        sublistId: 'line',
-        fieldId: 'memo',
+        sublistId: "line",
+        fieldId: "memo",
         value: spsreferenceNum,
         line: 1
-      })
+      });
     }
 
     //save journal entry record.
-    let je_id = createJE.save()
+    let je_id = createJE.save();
 
     log.debug({
-      title: 'je_id ' + cust,
+      title: "je_id " + cust,
       details: je_id
-    })
+    });
 
     loadSpsRecord.setValue({
-      fieldId: 'custbody_je_created',
+      fieldId: "custbody_je_created",
       value: true
-    })
+    });
   }
 
   /**
@@ -1737,40 +1785,40 @@ define(['N/record', 'N/runtime', 'N/search'], function (
    * @param {Array} invoiceNumberArr - contains invoice number to search on invoice record
    * @since 2015.2
    */
-  function invoiceSearch (invoiceNumberArr) {
+  function invoiceSearch(invoiceNumberArr) {
     try {
       let invoiceSearch = search.create({
-        type: 'invoice',
+        type: "invoice",
         filters: [
-          ['type', 'anyof', 'CustInvc'],
-          'AND',
+          ["type", "anyof", "CustInvc"],
+          "AND",
           invoiceNumberArr,
-          'AND',
-          ['mainline', 'is', 'T']
+          "AND",
+          ["mainline", "is", "T"]
           // 'AND',
           // ['status', 'noneof', 'CustInvc:B']
         ],
         columns: [
-          search.createColumn({ name: 'tranid', label: 'Document Number' }),
-          search.createColumn({ name: 'entity', label: 'Name' }),
-          search.createColumn({ name: 'internalid', label: 'Internal ID' }),
+          search.createColumn({ name: "tranid", label: "Document Number" }),
+          search.createColumn({ name: "entity", label: "Name" }),
+          search.createColumn({ name: "internalid", label: "Internal ID" }),
           search.createColumn({
-            name: 'transactionname',
-            label: 'Transaction Name'
+            name: "transactionname",
+            label: "Transaction Name"
           }),
-          search.createColumn({ name: 'statusref', label: 'Status' }),
-          search.createColumn({ name: 'otherrefnum', label: 'PO/Check Number' })
+          search.createColumn({ name: "statusref", label: "Status" }),
+          search.createColumn({ name: "otherrefnum", label: "PO/Check Number" })
         ]
-      })
+      });
 
       //log.debug('invoiceNumberArr', invoiceNumberArr)
 
-      let searchResultInv = searchAll(invoiceSearch.run())
+      let searchResultInv = searchAll(invoiceSearch.run());
       //log.debug('searchResultInv', searchResultInv)
 
-      return searchResultInv
+      return searchResultInv;
     } catch (e) {
-      log.debug('error in invoiceSearch', e.toString())
+      log.debug("error in invoiceSearch", e.toString());
     }
   }
 
@@ -1779,51 +1827,51 @@ define(['N/record', 'N/runtime', 'N/search'], function (
    * @param {Array} resultset - pass search
    * @since 2015.2
    */
-  function searchAll (resultset) {
-    var allResults = []
-    var startIndex = 0
-    var RANGECOUNT = 1000
+  function searchAll(resultset) {
+    var allResults = [];
+    var startIndex = 0;
+    var RANGECOUNT = 1000;
 
     do {
       var pagedResults = resultset.getRange({
         start: parseInt(startIndex),
         end: parseInt(startIndex + RANGECOUNT)
-      })
+      });
 
-      allResults = allResults.concat(pagedResults)
+      allResults = allResults.concat(pagedResults);
 
-      var pagedResultsCount = pagedResults != null ? pagedResults.length : 0
-      startIndex += pagedResultsCount
+      var pagedResultsCount = pagedResults != null ? pagedResults.length : 0;
+      startIndex += pagedResultsCount;
 
-      var remainingUsage = runtime.getCurrentScript().getRemainingUsage()
-    } while (pagedResultsCount == RANGECOUNT)
+      var remainingUsage = runtime.getCurrentScript().getRemainingUsage();
+    } while (pagedResultsCount == RANGECOUNT);
 
-    var remainingUsage = runtime.getCurrentScript().getRemainingUsage()
+    var remainingUsage = runtime.getCurrentScript().getRemainingUsage();
 
-    return allResults
+    return allResults;
   }
 
-  function _logValidation (value) {
+  function _logValidation(value) {
     if (
       value != null &&
-      value != '' &&
-      value != 'null' &&
+      value != "" &&
+      value != "null" &&
       value != undefined &&
-      value != 'undefined' &&
-      value != '@NONE@' &&
-      value != 'NaN'
+      value != "undefined" &&
+      value != "@NONE@" &&
+      value != "NaN"
     ) {
-      return true
+      return true;
     } else {
-      return false
+      return false;
     }
   }
 
-  function isNumber (n) {
-    return /^-?[\d.]+(?:e-?\d+)?$/.test(n)
+  function isNumber(n) {
+    return /^-?[\d.]+(?:e-?\d+)?$/.test(n);
   }
 
   return {
     afterSubmit: afterSubmit
-  }
-})
+  };
+});
