@@ -101,14 +101,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             checkDataObjArr.push({
               memo: invoiceNumber,
               adjustAmt: netPaidAmt,
-              invoiceNumber: invoiceNumber
-            });
-
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
+              invoiceNumber: invoiceNumber,
+              i: i
             });
           }
 
@@ -119,13 +113,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             netPaidAmt > 0
           ) {
             invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
-            paymentObj[invoiceNumber] = netPaidAmt;
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
+            paymentObj[invoiceNumber] = { netPaidAmt: netPaidAmt, i: i };
           }
         }
 
@@ -289,6 +277,13 @@ define(["N/record", "N/runtime", "N/search"], function (
                   invoiceToPayment.commitLine({
                     sublistId: "apply"
                   });
+
+                  loadSpsRecord.setSublistValue({
+                    sublistId: "line",
+                    fieldId: "custcol_gbs_ispaymentcreate",
+                    line: paymentObj[obj.tranid].i,
+                    value: true
+                  });
                 }
               }
             }
@@ -367,6 +362,13 @@ define(["N/record", "N/runtime", "N/search"], function (
             createCheck.commitLine({
               sublistId: "expense"
             });
+
+            loadSpsRecord.setSublistValue({
+              sublistId: "line",
+              fieldId: "custcol_gbs_is_check_created",
+              line: checkDataObjArr[j].i,
+              value: true
+            });
           }
 
           if (checkPaymentLine) {
@@ -439,7 +441,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             checkDataObjArr.push({
               memo: microfilm,
               adjustAmt: adjustAmt,
-              invoiceNumber: invoiceNumber
+              invoiceNumber: invoiceNumber,
+              i: i
             });
             loadSpsRecord.setSublistValue({
               sublistId: "line",
@@ -452,13 +455,13 @@ define(["N/record", "N/runtime", "N/search"], function (
           //PAYMENT DATA
           if (!!invoiceNumber && paymentCreateCheckbox == false) {
             invoiceNumberArr.push(["poastext", "is", invoiceNumber], "OR");
-            preDiscObj[invoiceNumber] = netPaidAmt;
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
+            preDiscObj[invoiceNumber] = { netPaidAmt: netPaidAmt, i: i };
+            // loadSpsRecord.setSublistValue({
+            //   sublistId: "line",
+            //   fieldId: "custcol_gbs_ispaymentcreate",
+            //   line: i,
+            //   value: true
+            // });
           }
         }
         invoiceNumberArr.pop();
@@ -541,10 +544,16 @@ define(["N/record", "N/runtime", "N/search"], function (
                 invoiceToPayment.setCurrentSublistValue({
                   sublistId: "apply",
                   fieldId: "amount",
-                  value: preDiscObj[poNum]
+                  value: preDiscObj[poNum].netPaidAmt
                 });
                 invoiceToPayment.commitLine({
                   sublistId: "apply"
+                });
+                loadSpsRecord.setSublistValue({
+                  sublistId: "line",
+                  fieldId: "custcol_gbs_ispaymentcreate",
+                  line: preDiscObj[poNum].i,
+                  value: true
                 });
               }
             }
@@ -611,6 +620,12 @@ define(["N/record", "N/runtime", "N/search"], function (
             });
             createCheck.commitLine({
               sublistId: "expense"
+            });
+            loadSpsRecord.setSublistValue({
+              sublistId: "line",
+              fieldId: "custcol_gbs_is_check_created",
+              line: checkDataObjArr[j].i,
+              value: true
             });
           }
 
@@ -702,18 +717,24 @@ define(["N/record", "N/runtime", "N/search"], function (
             (adjustAmt || netPaidAmt) &&
             !purchaseOrNumber
           ) {
-            checkDataObjArr.push({
-              memo: microfilm,
-              adjustAmt: adjustAmt || netPaidAmt,
-              invoiceNumber: invoiceNumber
-            });
-
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
+            log.debug('invoiceNumber.toString().charAt(0) == "7"', invoiceNumber.toString().charAt(0) == "7")
+            if (invoiceNumber.toString().charAt(0) == "7") {
+              checkDataObjArr.push({
+                memo: microfilm,
+                adjustAmt: adjustAmt || netPaidAmt,
+                invoiceNumber: invoiceNumber,
+                i: i,
+                sevenThousand: true
+              });
+            } else {
+              checkDataObjArr.push({
+                memo: microfilm,
+                adjustAmt: adjustAmt || netPaidAmt,
+                invoiceNumber: invoiceNumber,
+                i: i,
+                sevenThousand: false
+              });
+            }
           }
 
           //PAYMENT DATA
@@ -721,14 +742,9 @@ define(["N/record", "N/runtime", "N/search"], function (
             invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
             paymentObj[invoiceNumber] = {
               netPaidAmt: netPaidAmt,
-              remittanceDisc: remittanceDisc + Math.abs(adjustAmt)
+              remittanceDisc: remittanceDisc + Math.abs(adjustAmt),
+              i: i
             };
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
           }
         }
 
@@ -924,6 +940,15 @@ define(["N/record", "N/runtime", "N/search"], function (
                   invoiceToPayment.commitLine({
                     sublistId: "apply"
                   });
+
+                  if (_logValidation(paymentObj[obj.tranid].i)) {
+                    loadSpsRecord.setSublistValue({
+                      sublistId: "line",
+                      fieldId: "custcol_gbs_ispaymentcreate",
+                      line: paymentObj[obj.tranid].i,
+                      value: true
+                    });
+                  }
                 }
               }
             }
@@ -973,18 +998,29 @@ define(["N/record", "N/runtime", "N/search"], function (
             });
           }
 
+          log.debug('checkDataObjArr', checkDataObjArr)
+
           for (let j = 0; j < checkDataObjArr.length; j++) {
             checkPaymentLine++;
             createCheck.selectNewLine({
               sublistId: "expense"
             });
 
-            createCheck.setCurrentSublistValue({
-              sublistId: "expense",
-              fieldId: "account",
-              value: 435,
-              ignoreFieldChange: true
-            });
+            if (checkDataObjArr[j].sevenThousand) {
+              createCheck.setCurrentSublistValue({
+                sublistId: "expense",
+                fieldId: "account",
+                value: 450,
+                ignoreFieldChange: true
+              });
+            } else {
+              createCheck.setCurrentSublistValue({
+                sublistId: "expense",
+                fieldId: "account",
+                value: 435,
+                ignoreFieldChange: true
+              });
+            }
 
             createCheck.setCurrentSublistValue({
               sublistId: "expense",
@@ -995,11 +1031,18 @@ define(["N/record", "N/runtime", "N/search"], function (
             createCheck.setCurrentSublistValue({
               sublistId: "expense",
               fieldId: "amount",
-              value: checkDataObjArr[j].adjustAmt
+              value: Math.abs(checkDataObjArr[j].adjustAmt)
             });
 
             createCheck.commitLine({
               sublistId: "expense"
+            });
+
+            loadSpsRecord.setSublistValue({
+              sublistId: "line",
+              fieldId: "custcol_gbs_is_check_created",
+              line: checkDataObjArr[j].i,
+              value: true
             });
           }
 
@@ -1083,14 +1126,15 @@ define(["N/record", "N/runtime", "N/search"], function (
             checkDataObjArr.push({
               memo: memo,
               adjustAmt: adjustAmt,
-              invoiceNumber: invoiceNumber
+              invoiceNumber: invoiceNumber,
+              i: i
             });
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
+            // loadSpsRecord.setSublistValue({
+            //   sublistId: "line",
+            //   fieldId: "custcol_gbs_ispaymentcreate",
+            //   line: i,
+            //   value: true
+            // });
           }
 
           let preDiscAmt =
@@ -1099,23 +1143,26 @@ define(["N/record", "N/runtime", "N/search"], function (
               fieldId: "custcol_sps_cx_originalamt",
               line: i
             }) || 0;
+
           //PAYMENT DATA
           if (
             !(preDiscAmt > 0 && !invoiceNumber) &&
             paymentCreateCheckbox == false &&
             preDiscAmt
           ) {
+            //change 2
             invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
             preDiscObj[invoiceNumber] = {
               preDiscAmt: preDiscAmt * 0.02,
-              payment: preDiscAmt - preDiscAmt * 0.02
+              payment: preDiscAmt - preDiscAmt * 0.02,
+              i: i
             };
-            loadSpsRecord.setSublistValue({
-              sublistId: "line",
-              fieldId: "custcol_gbs_ispaymentcreate",
-              line: i,
-              value: true
-            });
+            // loadSpsRecord.setSublistValue({
+            //   sublistId: "line",
+            //   fieldId: "custcol_gbs_ispaymentcreate",
+            //   line: i,
+            //   value: true
+            // });
           }
         }
         invoiceNumberArr.pop();
@@ -1205,6 +1252,13 @@ define(["N/record", "N/runtime", "N/search"], function (
                 invoiceToPayment.commitLine({
                   sublistId: "apply"
                 });
+
+                loadSpsRecord.setSublistValue({
+                  sublistId: "line",
+                  fieldId: "custcol_gbs_ispaymentcreate",
+                  line: preDiscObj[poNum].i,
+                  value: true
+                });
               }
             }
           }
@@ -1273,6 +1327,13 @@ define(["N/record", "N/runtime", "N/search"], function (
             });
             createCheck.commitLine({
               sublistId: "expense"
+            });
+
+            loadSpsRecord.setSublistValue({
+              sublistId: "line",
+              fieldId: "custcol_gbs_is_check_created",
+              line: checkDataObjArr[j].i,
+              value: true
             });
           }
 
@@ -1363,12 +1424,13 @@ define(["N/record", "N/runtime", "N/search"], function (
             adjustAmt &&
             (!purchaseOrNumber || purchaseOrNumber === "NOT REQU")
           ) {
+            //1 change
             checkDataObjArr.push({
               memo: microfilm,
               adjustAmt: adjustAmt,
               invoiceNumber: invoiceNumber,
               microfilm: microfilm,
-              i:i
+              i: i
             });
           }
 
@@ -1559,6 +1621,7 @@ define(["N/record", "N/runtime", "N/search"], function (
                   });
                 }
 
+                //checkbox check
                 for (let h = 0; h < preDiscObj[poNum].paymentline.length; h++) {
                   loadSpsRecord.setSublistValue({
                     sublistId: "line",
@@ -1611,7 +1674,6 @@ define(["N/record", "N/runtime", "N/search"], function (
           var checkPaymentLine = 0;
 
           for (let j = 0; j < checkDataObjArr.length; j++) {
-            
             checkPaymentLine++;
             createCheck.selectNewLine({
               sublistId: "expense"
@@ -1642,7 +1704,6 @@ define(["N/record", "N/runtime", "N/search"], function (
               line: checkDataObjArr[j].i,
               value: true
             });
-
           }
 
           if (checkPaymentLine) {
