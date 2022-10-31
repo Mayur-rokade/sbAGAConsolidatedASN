@@ -25,6 +25,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 ) {
   function afterSubmit(scriptContext) {
     try {
+      if (context.type === context.UserEventType.EDIT) {
+        
       var loadSpsRecordContext = scriptContext.newRecord;
       var internalidSps = loadSpsRecordContext.id;
       var invoiceNumberArr = [];
@@ -1736,6 +1738,7 @@ define(["N/record", "N/runtime", "N/search"], function (
       loadSpsRecord.setValue("transtatus", "B");
 
       loadSpsRecord.save();
+      }
     } catch (e) {
       log.debug({
         title: "e",
