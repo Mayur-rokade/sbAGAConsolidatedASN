@@ -25,8 +25,11 @@ define(["N/record", "N/runtime", "N/search"], function (
 ) {
   function afterSubmit(scriptContext) {
     try {
-      if (scriptContext.type === scriptContext.UserEventType.EDIT) {
-        
+     // if (scriptContext.type === scriptContext.UserEventType.EDIT) {
+
+     //RUN ON EVERY CONTEXT
+     //DO NOT RUN IF THE STATUS IS PROCESSED
+     
       var loadSpsRecordContext = scriptContext.newRecord;
       var internalidSps = loadSpsRecordContext.id;
       var invoiceNumberArr = [];
@@ -38,6 +41,8 @@ define(["N/record", "N/runtime", "N/search"], function (
         id: internalidSps
       });
 
+      if (loadSpsRecord.getValue("transtatus") != "B") {
+        
       var spsTradingPartnerId = loadSpsRecord.getValue({
         fieldId: "custbody_sps_cx_tpid"
       });
@@ -188,8 +193,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 
             invoiceToPayment.setValue({
               fieldId: "account",
-              value: 571 //sb
-             // value: 573 //Lowe clearing prod
+             // value: 571 //sb
+              value: 573 //Lowe clearing prod
             });
 
             if (_logValidation(spsdatesps)) {
@@ -274,7 +279,7 @@ define(["N/record", "N/runtime", "N/search"], function (
                   invoiceToPayment.setCurrentSublistValue({
                     sublistId: "apply",
                     fieldId: "amount",
-                    value: paymentObj[obj.tranid]
+                    value: paymentObj[obj.tranid].netPaidAmt
                   });
 
                   invoiceToPayment.commitLine({
@@ -314,8 +319,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           createCheck.setValue({
             fieldId: "account",
-            value: 571 //sb
-            //value: 573 //lowe clearing
+           // value: 571 //sb
+            value: 573 //lowe clearing
           });
 
           createCheck.setValue({
@@ -377,12 +382,13 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           if (checkPaymentLine) {
             createCheck.save();
+            loadSpsRecord.setValue({
+              fieldId: "custbody_gbs_check_created",
+              value: true
+            });
           }
 
-          loadSpsRecord.setValue({
-            fieldId: "custbody_gbs_check_created",
-            value: true
-          });
+          
         }
 
         /********************CREATE JE*******************/
@@ -397,8 +403,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             spsreferenceNum,
             totalTranAmt,
             loadSpsRecord,
-           // 573, //prod
-            571, //sb
+            573, //prod
+           // 571, //sb
             221
           );
         }
@@ -485,7 +491,8 @@ define(["N/record", "N/runtime", "N/search"], function (
         });
         invoiceToPayment.setValue({
           fieldId: "account",
-          value: 574 //sb and prod
+          //value: 574 //sb
+          value: 576 //prod
         });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
@@ -521,6 +528,7 @@ define(["N/record", "N/runtime", "N/search"], function (
               label: "PO/Check Number"
             });
             log.debug("poNum", poNum);
+            log.debug("tranid", tranid);
             let status = searchResultInv[i].getValue({
               name: "statusref",
               label: "Status"
@@ -584,7 +592,8 @@ define(["N/record", "N/runtime", "N/search"], function (
           });
           createCheck.setValue({
             fieldId: "account",
-            value: 574 //sb and prod
+            // value: 574 //sb
+            value: 576 //prod
           });
           createCheck.setValue({
             fieldId: "custbody_820_payment_order",
@@ -610,8 +619,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             createCheck.setCurrentSublistValue({
               sublistId: "expense",
               fieldId: "account",
-             // value: 434, //prod
-              value: 578, //sb
+              value: 434, //sb & prod
               ignoreFieldChange: true
             });
             createCheck.setCurrentSublistValue({
@@ -637,12 +645,13 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           if (checkPaymentLine) {
             createCheck.save();
+            loadSpsRecord.setValue({
+              fieldId: "custbody_gbs_check_created",
+              value: true
+            });
           }
 
-          loadSpsRecord.setValue({
-            fieldId: "custbody_gbs_check_created",
-            value: true
-          });
+         
         }
 
         /********************CREATE JE*******************/
@@ -657,7 +666,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             spsreferenceNum,
             totalTranAmt,
             loadSpsRecord,
-            574, //target clearing
+            //574, //target clearing
+            576, //target clearing prod
             221
           );
         }
@@ -825,8 +835,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 
             invoiceToPayment.setValue({
               fieldId: "account",
-              value: 573 //sb
-              //value: 575 //prod
+              //value: 573 //sb
+              value: 575 //prod
             });
 
             if (_logValidation(spsdatesps)) {
@@ -985,8 +995,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           createCheck.setValue({
             fieldId: "account",
-            //value: 575 //walmart clearing prod
-            value: 573 //walmart clearing sb
+            value: 575 //walmart clearing prod
+            //value: 573 //walmart clearing sb
           });
 
           createCheck.setValue({
@@ -1025,8 +1035,8 @@ define(["N/record", "N/runtime", "N/search"], function (
               createCheck.setCurrentSublistValue({
                 sublistId: "expense",
                 fieldId: "account",
-                //value: 435, prod
-                value: 435, //sb
+                value: 435, //prod
+                //value: 435, //sb
                 ignoreFieldChange: true
               });
             }
@@ -1058,6 +1068,10 @@ define(["N/record", "N/runtime", "N/search"], function (
           if (checkPaymentLine) {
             try {
               createCheck.save();
+              loadSpsRecord.setValue({
+                fieldId: "custbody_gbs_check_created",
+                value: true
+              });
             } catch (error) {
               log.debug(
                 "Negative amount encountered on check for walmart",
@@ -1084,12 +1098,13 @@ define(["N/record", "N/runtime", "N/search"], function (
             spsreferenceNum,
             totalTranAmt,
             loadSpsRecord,
-            //575, //prod
-            573, //sb
+            575, //prod
+            //573, //sb
             221,
             "walmart"
           );
         }
+
       } else if (spsTradingPartnerId === 537 || spsTradingPartnerId === "537") {
         //MACY
         let preDiscObj = {};
@@ -1191,8 +1206,8 @@ define(["N/record", "N/runtime", "N/search"], function (
         });
         invoiceToPayment.setValue({
           fieldId: "account",
-          value: 575 //sb
-          //value: 577 //macy clearing
+          //value: 575 //sb
+          value: 577 //macy clearing prod
         });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
@@ -1267,7 +1282,7 @@ define(["N/record", "N/runtime", "N/search"], function (
                 loadSpsRecord.setSublistValue({
                   sublistId: "line",
                   fieldId: "custcol_gbs_ispaymentcreate",
-                  line: preDiscObj[poNum].i,
+                  line: preDiscObj[tranid].i,
                   value: true
                 });
               }
@@ -1294,8 +1309,8 @@ define(["N/record", "N/runtime", "N/search"], function (
           });
           createCheck.setValue({
             fieldId: "account",
-           // value: 577 //macy clearing prod
-            value: 575 //macy clearing sb
+            value: 577 //macy clearing prod
+           // value: 575 //macy clearing sb
           });
           createCheck.setValue({
             fieldId: "custbody_820_payment_order",
@@ -1323,8 +1338,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             createCheck.setCurrentSublistValue({
               sublistId: "expense",
               fieldId: "account",
-              value: 576, //sb
-              //value: 578, //macy chargeback prod
+             // value: 576, //sb
+              value: 578, //macy chargeback prod
               ignoreFieldChange: true
             });
             createCheck.setCurrentSublistValue({
@@ -1340,7 +1355,6 @@ define(["N/record", "N/runtime", "N/search"], function (
             createCheck.commitLine({
               sublistId: "expense"
             });
-
             loadSpsRecord.setSublistValue({
               sublistId: "line",
               fieldId: "custcol_gbs_is_check_created",
@@ -1351,12 +1365,12 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           if (checkPaymentLine) {
             createCheck.save();
+            loadSpsRecord.setValue({
+              fieldId: "custbody_gbs_check_created",
+              value: true
+            });
           }
-
-          loadSpsRecord.setValue({
-            fieldId: "custbody_gbs_check_created",
-            value: true
-          });
+          
         }
 
         /********************CREATE JE*******************/
@@ -1370,11 +1384,12 @@ define(["N/record", "N/runtime", "N/search"], function (
             spsreferenceNum,
             totalTranAmt,
             loadSpsRecord,
-           // 577, prod 
-            575, //sb
+            577, //prod 
+           // 575, //sb
             221
           );
         }
+
       } else if (spsTradingPartnerId === 119 || spsTradingPartnerId === "119") {
         //HOME DEPOT
         let preDiscObj = {};
@@ -1523,8 +1538,8 @@ define(["N/record", "N/runtime", "N/search"], function (
         });
         invoiceToPayment.setValue({
           fieldId: "account",
-           value: 572 //sb
-         // value: 574 //prod 
+        //   value: 572 //sb
+         value: 574 //prod 
         });
         if (_logValidation(spsdatesps)) {
           invoiceToPayment.setValue({
@@ -1565,9 +1580,11 @@ define(["N/record", "N/runtime", "N/search"], function (
               name: "otherrefnum",
               label: "PO/Check Number"
             });
-            poNum = poNum ? parseInt(poNum) : tranid;
+            poNum = (poNum && poNum != 'Memorized') ? parseInt(poNum) : tranid;
             log.debug("poNum", poNum);
-
+            log.debug("tranid", tranid);
+            log.debug('1581', searchResultInv[i].getValue({ name: "internalid", label: "Internal ID" })); //{ name: "internalid", label: "Internal ID" }
+            
             if (status === "paidInFull") {
               //todo array checkbox
               //checkboxValueArr
@@ -1667,8 +1684,8 @@ define(["N/record", "N/runtime", "N/search"], function (
           });
           createCheck.setValue({
             fieldId: "account",
-         //   value: 574 //prod
-             value: 572 //sb
+           value: 574 //prod
+          //   value: 572 //sb
           });
           createCheck.setValue({
             fieldId: "custbody_820_payment_order",
@@ -1723,12 +1740,13 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           if (checkPaymentLine) {
             createCheck.save();
+            loadSpsRecord.setValue({
+              fieldId: "custbody_gbs_check_created",
+              value: true
+            });
           }
 
-          loadSpsRecord.setValue({
-            fieldId: "custbody_gbs_check_created",
-            value: true
-          });
+          
         }
 
         /********************CREATE JE*******************/
@@ -1742,8 +1760,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             spsreferenceNum,
             totalTranAmt,
             loadSpsRecord,
-             572, //sb
-           // 574, //prod
+           //  572, //sb
+            574, //prod
             221
           );
         }
@@ -1753,6 +1771,8 @@ define(["N/record", "N/runtime", "N/search"], function (
 
       loadSpsRecord.save();
       }
+      
+    //  }
     } catch (e) {
       log.debug({
         title: "e",
