@@ -766,10 +766,10 @@ define(["N/record", "N/runtime", "N/search"], function (
 
         invoiceNumberArr.pop();
 
-        // log.debug({
-        //   title: 'invoiceNumberArr',
-        //   details: invoiceNumberArr
-        // })
+        log.debug({
+          title: 'invoiceNumberArr',
+          details: invoiceNumberArr
+        })
 
         /***************************CREATE PAYMENT************************/
         if (invoiceNumberArr.length != 0) {
@@ -784,7 +784,7 @@ define(["N/record", "N/runtime", "N/search"], function (
 
           let custArr = [];
           let custObj = {};
-
+      
           for (let i = 0; i < invoiceResultLength; i++) {
             let customer = searchResultInv[i].getValue({
               name: "entity",
@@ -1892,10 +1892,12 @@ define(["N/record", "N/runtime", "N/search"], function (
         type: "invoice",
         filters: [
           ["type", "anyof", "CustInvc"],
+           "AND",
+           invoiceNumberArr,
           "AND",
-          invoiceNumberArr,
-          "AND",
-          ["mainline", "is", "T"]
+          ["mainline", "is", "T"],
+          //"OR",
+          //["tranid", "is", "954775529"]
           // 'AND',
           // ['status', 'noneof', 'CustInvc:B']
         ],
@@ -1912,10 +1914,10 @@ define(["N/record", "N/runtime", "N/search"], function (
         ]
       });
 
-      //log.debug('invoiceNumberArr', invoiceNumberArr)
-
+      log.debug('invoiceNumberArr', invoiceNumberArr)
+log.debug('invoiceSearch',invoiceSearch)
       let searchResultInv = searchAll(invoiceSearch.run());
-      //log.debug('searchResultInv', searchResultInv)
+      log.debug('searchResultInv', searchResultInv)
 
       return searchResultInv;
     } catch (e) {
