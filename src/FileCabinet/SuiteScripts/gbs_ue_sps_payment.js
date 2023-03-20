@@ -678,7 +678,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             sublistId: "line",
             fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          });
+          }) ;
 
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
             sublistId: "line",
@@ -1520,6 +1520,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             });
           }
         }
+        
         invoiceNumberArr.pop();
         log.debug("preDiscObj", preDiscObj);
         // log.debug({
