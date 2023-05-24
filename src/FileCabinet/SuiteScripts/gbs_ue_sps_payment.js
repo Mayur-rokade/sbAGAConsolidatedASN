@@ -769,14 +769,14 @@ define(["N/record", "N/runtime", "N/search"], function (
         invoiceNumberArr.pop();
         invoiceponumArr.pop();
 
-        log.debug({
-          title: 'invoiceponumArr',
-          details: invoiceponumArr
-        })
-        log.debug({
-          title: 'invoiceNumberArr',
-          details: invoiceNumberArr
-        })
+        // log.debug({
+        //   title: 'invoiceponumArr',
+        //   details: invoiceponumArr
+        // })
+        // log.debug({
+        //   title: 'invoiceNumberArr',
+        //   details: invoiceNumberArr
+        // })
 
         /***************************CREATE PAYMENT************************/
         if (invoiceNumberArr.length != 0) {
@@ -823,8 +823,8 @@ define(["N/record", "N/runtime", "N/search"], function (
             }
           }
 
-          log.debug("custObj 195", custObj);
-          log.debug("paymentObj 195", paymentObj);
+         // log.debug("custObj 195", custObj);
+          //log.debug("paymentObj 195", paymentObj);
 
           for (const key in custObj) {
             let paymentLine = 0;
@@ -839,31 +839,15 @@ define(["N/record", "N/runtime", "N/search"], function (
               fieldId: "customer",
               value: key
             });
-
-            invoiceToPayment.setValue({
-              fieldId: "account",
-              //value: 573 //sb
-              value: 575 //prod
-            });
-
-            if (_logValidation(spsdatesps)) {
-              invoiceToPayment.setValue({
-                fieldId: "trandate",
-                value: spsdatesps
-              });
-            }
-
-            if (_logValidation(spsreferenceNum)) {
-              invoiceToPayment.setValue({
-                fieldId: "memo",
-                value: spsreferenceNum
-              });
-            }
-
-            invoiceToPayment.setValue({
-              fieldId: "custbody_820_payment_order",
-              value: internalidSps
-            });
+               log.debug('key',key)
+               if(_logValidation(key)){
+                invoiceToPayment.setValue({
+                  fieldId: "account",
+                  //value: 573 //sb
+                  value: parseInt(575) //prod
+                });
+               }
+           
 
             if (_logValidation(spsdatesps)) {
               invoiceToPayment.setValue({
@@ -884,7 +868,28 @@ define(["N/record", "N/runtime", "N/search"], function (
               value: internalidSps
             });
 
+            if (_logValidation(spsdatesps)) {
+              invoiceToPayment.setValue({
+                fieldId: "trandate",
+                value: spsdatesps
+              });
+            }
+
+            if (_logValidation(spsreferenceNum)) {
+              invoiceToPayment.setValue({
+                fieldId: "memo",
+                value: spsreferenceNum
+              });
+            }
+
+            invoiceToPayment.setValue({
+              fieldId: "custbody_820_payment_order",
+              value: internalidSps
+            });
+log.debug('arr.length',arr.length);
+var xx=0
             for (let b = 0; b < arr.length; b++) {
+              xx=xx+1
               let obj = arr[b];
 
               log.debug('obj 847', obj)
@@ -976,12 +981,17 @@ define(["N/record", "N/runtime", "N/search"], function (
                 }
               }
             }
-
+            log.debug('xx',xx)
+            log.debug('paymentLine',paymentLine)
             if (paymentLine) {
+              log.debug('Payment is Saving')
               invoiceToPayment.save({
                 enableSourcing: true,
                 ignoreMandatoryFields: true
               });
+              log.debug('Payment is saved')
+            }else{
+              log.debug('inside another else')
             }
           }
         }
@@ -989,7 +999,8 @@ define(["N/record", "N/runtime", "N/search"], function (
         var checkPaymentLine = 0;
 
         /**********************CREATE CHECK*****************/
-        if (!checkCreated) {
+        log.debug('checkCreated',checkCreated)
+         if (!checkCreated) {
           var createCheck = record.create({
             type: "check",
             isDynamic: true
@@ -999,12 +1010,14 @@ define(["N/record", "N/runtime", "N/search"], function (
             fieldId: "entity",
             value: 540
           });
-
+          log.debug('createCheck',createCheck)
+             log.debug('1002')
           createCheck.setValue({
             fieldId: "account",
             value: 575 //walmart clearing prod
             //value: 573 //walmart clearing sb
           });
+          log.debug('1008')
 
           createCheck.setValue({
             fieldId: "custbody_820_payment_order",
