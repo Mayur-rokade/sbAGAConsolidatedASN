@@ -33,6 +33,7 @@ define(["N/record", "N/runtime", "N/search"], function (
       var loadSpsRecordContext = scriptContext.newRecord;
       var internalidSps = loadSpsRecordContext.id;
       var invoiceNumberArr = [];
+      var invoiceponumArr=[]
       var checkDataObjArr = [];
       var paymentObj = {};
 
@@ -678,7 +679,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             sublistId: "line",
             fieldId: "custcol_sps_cx_invoicenumber",
             line: i
-          }) ;
+          });
 
           let paymentCreateCheckbox = loadSpsRecord.getSublistValue({
             sublistId: "line",
@@ -756,6 +757,7 @@ define(["N/record", "N/runtime", "N/search"], function (
           //PAYMENT DATA
           if (!!invoiceNumber && paymentCreateCheckbox == false) {
             invoiceNumberArr.push(["numbertext", "is", invoiceNumber], "OR");
+            invoiceponumArr.push(["otherrefnum", "equalto", purchaseOrNumber], "OR");
             paymentObj[invoiceNumber] = {
               netPaidAmt: netPaidAmt,
               remittanceDisc: remittanceDisc + Math.abs(adjustAmt),
@@ -765,7 +767,12 @@ define(["N/record", "N/runtime", "N/search"], function (
         }
 
         invoiceNumberArr.pop();
+        invoiceponumArr.pop();
 
+        log.debug({
+          title: 'invoiceponumArr',
+          details: invoiceponumArr
+        })
         log.debug({
           title: 'invoiceNumberArr',
           details: invoiceNumberArr
@@ -773,7 +780,7 @@ define(["N/record", "N/runtime", "N/search"], function (
 
         /***************************CREATE PAYMENT************************/
         if (invoiceNumberArr.length != 0) {
-          var searchResultInv = invoiceSearch(invoiceNumberArr);
+          var searchResultInv = invoiceSearchForWalmart(invoiceNumberArr,invoiceponumArr);
 
           // log.debug({
           //   title: 'searchResultInv',
@@ -880,7 +887,7 @@ define(["N/record", "N/runtime", "N/search"], function (
             for (let b = 0; b < arr.length; b++) {
               let obj = arr[b];
 
-              //log.debug('obj 847', obj)
+              log.debug('obj 847', obj)
 
               if (obj.status === "paidInFull") {
                 //todo array checkbox
@@ -1520,7 +1527,6 @@ define(["N/record", "N/runtime", "N/search"], function (
             });
           }
         }
-        
         invoiceNumberArr.pop();
         log.debug("preDiscObj", preDiscObj);
         // log.debug({
@@ -1887,16 +1893,18 @@ define(["N/record", "N/runtime", "N/search"], function (
    * @param {Array} invoiceNumberArr - contains invoice number to search on invoice record
    * @since 2015.2
    */
-  function invoiceSearch(invoiceNumberArr) {
+  function invoiceSearchForWalmart(invoiceNumberArr,invoiceponumArr) {
     try {
       let invoiceSearch = search.create({
         type: "invoice",
         filters: [
           ["type", "anyof", "CustInvc"],
            "AND",
-           invoiceNumberArr,
+          invoiceNumberArr,
+           "OR",
+           invoiceponumArr,
           "AND",
-          ["mainline", "is", "T"],
+          ["mainline", "is", "T"]
           //"OR",
           //["tranid", "is", "954775529"]
           // 'AND',
@@ -1925,7 +1933,45 @@ log.debug('invoiceSearch',invoiceSearch)
       log.debug("error in invoiceSearch", e.toString());
     }
   }
+  function invoiceSearch(invoiceNumberArr) {
+    try {
 
+      let invoiceSearch = search.create({
+        type: "invoice",
+        filters: [
+          ["type", "anyof", "CustInvc"],
+           "AND",
+          invoiceNumberArr,
+          "AND",
+          ["mainline", "is", "T"]
+          //"OR",
+          //["tranid", "is", "954775529"]
+          // 'AND',
+          // ['status', 'noneof', 'CustInvc:B']
+        ],
+        columns: [
+          search.createColumn({ name: "tranid", label: "Document Number" }),
+          search.createColumn({ name: "entity", label: "Name" }),
+          search.createColumn({ name: "internalid", label: "Internal ID" }),
+          search.createColumn({
+            name: "transactionname",
+            label: "Transaction Name"
+          }),
+          search.createColumn({ name: "statusref", label: "Status" }),
+          search.createColumn({ name: "otherrefnum", label: "PO/Check Number" })
+        ]
+      });
+
+      log.debug('invoiceNumberArr', invoiceNumberArr)
+log.debug('invoiceSearch',invoiceSearch)
+      let searchResultInv = searchAll(invoiceSearch.run());
+      log.debug('searchResultInv', searchResultInv)
+
+      return searchResultInv;
+    } catch (e) {
+      log.debug("error in invoiceSearch", e.toString());
+    }
+  }
   /**
    * function is use to search all records with range
    * @param {Array} resultset - pass search
